@@ -2,36 +2,28 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="Cenoa Analytics 2025", layout="wide")
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Cenoa Analytics 2025", layout="wide", page_icon="📈")
 
-# ID del documento original para poder elegir la solapa por nombre
+# Estilo para mejorar la visualización de métricas
+st.markdown("""
+    <style>
+    [data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- CARGA DE DATOS ---
 SHEET_ID = "1fXJ2UsTeOE8ipYXeP5oQYYCHRNtDJDRC" 
 SHEET_NAME = "PERFO%20COMERCIAL2025"
 URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 @st.cache_data
 def load_data_2025():
-    # Cargamos el CSV
     df = pd.read_csv(URL)
-    
-    # Mapeo manual basado en tus instrucciones de columnas:
-    # Col A (0): CUIL -> Ignorar
-    # Col B (1): Vendedor
-    # Col D (3): Fecha de ingreso
-    # Col E (4): Empresa
-    # Col F (5): Localidad
-    # Col G (6): Tipo de Venta
-    
-    # Seleccionamos por índice para evitar errores de nombres
-    columnas_indices = [1, 3, 4, 5, 6] 
-    # También necesitamos traer las columnas de métricas (asumiendo que están después de la G)
-    # Traeremos todas y luego renombraremos las específicas que pediste.
-    
-    # Limpieza de nombres de columnas actuales
     df.columns = df.columns.str.strip()
     
-    # Renombrado forzado según tu estructura
+    # Mapeo por posición (B=1, D=3, E=4, F=5, G=6)
     rename_dict = {
         df.columns[1]: 'Vendedor',
         df.columns[3]: 'Fecha Ingreso',
@@ -41,76 +33,92 @@ def load_data_2025():
     }
     df = df.rename(columns=rename_dict)
     
-    # Convertir Fecha de Ingreso a formato fecha
-    df['Fecha Ingreso'] = pd.to_datetime(df['Fecha Ingreso'], errors='coerce')
-    
-    # Auto-detectar columnas de Ventas y Objetivo (suelen estar en H e I / índices 7 y 8)
-    col_ventas = next((c for c in df.columns if 'Venta' in c and c != 'Tipo de Venta'), df.columns[7])
-    col_obj = next((c for c in df.columns if 'Obj' in c or 'Meta' in c), df.columns[8])
-    
+    # Auto-detección de Ventas y Objetivo (posiciones H=7 e I=8 aprox)
+    col_ventas = df.columns[7]
+    col_obj = df.columns[8]
     df = df.rename(columns={col_ventas: 'Ventas', col_obj: 'Objetivo'})
     
     # Limpieza numérica
     for c in ['Ventas', 'Objetivo']:
         df[c] = pd.to_numeric(df[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        
+    
     return df
 
 try:
     df = load_data_2025()
 
-    st.title("🚗 Control Comercial 2025")
-    st.markdown("### Análisis por Estructura y Segmentación")
+    # --- TÍTULO PRINCIPAL ---
+    st.title("📊 Performance Comercial Grupo Cenoa")
+    st.caption("Dashboard de Análisis de Ventas y Cumplimiento - Ciclo 2025")
 
-    # --- BLOQUE DE FILTROS (Basado en tus columnas solicitadas) ---
-    st.sidebar.header("🔍 Filtros de Negocio")
+    # --- FILTROS LIMPIOS (Sin referencias de columnas) ---
+    st.sidebar.header("🎯 Panel de Filtros")
     
     with st.sidebar:
-        f_empresa = st.multiselect("Empresa (Col E)", options=sorted(df['Empresa'].dropna().unique()), default=df['Empresa'].dropna().unique())
-        f_localidad = st.multiselect("Localidad (Col F)", options=sorted(df['Localidad'].dropna().unique()), default=df['Localidad'].dropna().unique())
-        f_tipo = st.multiselect("Tipo de Venta (Col G)", options=sorted(df['Tipo de Venta'].dropna().unique()), default=df['Tipo de Venta'].dropna().unique())
-        f_vendedor = st.multiselect("Vendedor (Col B)", options=sorted(df['Vendedor'].dropna().unique()))
+        f_empresa = st.multiselect("Filtrar por Empresa", options=sorted(df['Empresa'].dropna().unique()), default=df['Empresa'].dropna().unique())
+        f_localidad = st.multiselect("Filtrar por Localidad", options=sorted(df['Localidad'].dropna().unique()), default=df['Localidad'].dropna().unique())
+        f_tipo = st.multiselect("Filtrar por Tipo de Venta", options=sorted(df['Tipo de Venta'].dropna().unique()), default=df['Tipo de Venta'].dropna().unique())
+        f_vendedor = st.multiselect("Buscar Vendedor Específico", options=sorted(df['Vendedor'].dropna().unique()))
 
-    # Aplicar Filtros
+    # Lógica de filtrado
     mask = df['Empresa'].isin(f_empresa) & df['Localidad'].isin(f_localidad) & df['Tipo de Venta'].isin(f_tipo)
     if f_vendedor:
         mask = mask & df['Vendedor'].isin(f_vendedor)
     
-    df_filtered = df[mask]
+    df_filtered = df[mask].copy()
 
-    # --- DASHBOARD ---
-    # Métricas principales
-    c1, c2, c3 = st.columns(3)
+    # --- INDICADORES ---
+    c1, c2, c3, c4 = st.columns(4)
     total_vta = df_filtered['Ventas'].sum()
     total_obj = df_filtered['Objetivo'].sum()
-    cumpl = (total_vta / total_obj * 100) if total_obj > 0 else 0
+    cumpl_prom = (total_vta / total_obj * 100) if total_obj > 0 else 0
     
-    c1.metric("Ventas Totales", f"{total_vta:,.0f}")
-    c2.metric("Cumplimiento Promedio", f"{cumpl:.1f}%")
-    c3.metric("Asesores Filtrados", len(df_filtered))
+    c1.metric("Ventas Totales", f"$ {total_vta:,.0f}")
+    c2.metric("Objetivo Total", f"$ {total_obj:,.0f}")
+    c3.metric("% Cumplimiento", f"{cumpl_prom:.1f}%")
+    c4.metric("Efectivos", len(df_filtered))
 
     st.divider()
 
-    # Gráfico de Productividad por Localidad y Empresa
-    col_left, col_right = st.columns(2)
+    # --- SECCIÓN: RANKING DE VENTAS ---
+    st.subheader("🏆 Ranking de Ventas por Asesor")
+    
+    # Preparamos el ranking
+    ranking_df = df_filtered.sort_values('Ventas', ascending=True) # Ascending True para que el mayor quede arriba en el bar chart horizontal
 
-    with col_left:
-        st.subheader("Performance por Empresa")
+    fig_ranking = px.bar(
+        ranking_df,
+        x='Ventas',
+        y='Vendedor',
+        orientation='h',
+        text='Ventas',
+        color='Ventas',
+        color_continuous_scale='Blues',
+        labels={'Ventas': 'Volumen de Ventas', 'Vendedor': 'Asesor Comercial'}
+    )
+    
+    fig_ranking.update_traces(texttemplate='%{text:.2s}', textposition='outside')
+    fig_ranking.update_layout(showlegend=False, height=max(400, len(ranking_df) * 30)) # Altura dinámica según cantidad de vendedores
+    
+    st.plotly_chart(fig_ranking, use_container_width=True)
+
+    # --- ANÁLISIS SECUNDARIO ---
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.subheader("📍 Ventas por Localidad")
+        fig_loc = px.pie(df_filtered, values='Ventas', names='Localidad', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+        st.plotly_chart(fig_loc, use_container_width=True)
+
+    with col_b:
+        st.subheader("🏢 Mix de Ventas por Empresa")
         fig_emp = px.bar(df_filtered.groupby('Empresa')['Ventas'].sum().reset_index(), 
-                         x='Empresa', y='Ventas', color='Empresa', text_auto=True)
+                         x='Empresa', y='Ventas', color='Empresa', text_auto='.2s')
         st.plotly_chart(fig_emp, use_container_width=True)
 
-    with col_right:
-        st.subheader("Cumplimiento por Vendedor (Col B)")
-        df_filtered['%'] = (df_filtered['Ventas'] / df_filtered['Objetivo'] * 100).round(1)
-        fig_vend = px.bar(df_filtered.sort_values('%'), x='%', y='Vendedor', orientation='h', 
-                          color='%', color_continuous_scale='RdYlGn')
-        st.plotly_chart(fig_vend, use_container_width=True)
-
-    # Tabla Maestra
-    with st.expander("📄 Ver Base de Datos (Columnas B, D, E, F, G)"):
-        st.write(df_filtered[['Vendedor', 'Fecha Ingreso', 'Empresa', 'Localidad', 'Tipo de Venta', 'Ventas', 'Objetivo']])
+    # Tabla detallada
+    with st.expander("📋 Ver detalle de datos filtrados"):
+        st.dataframe(df_filtered[['Vendedor', 'Empresa', 'Localidad', 'Tipo de Venta', 'Ventas', 'Objetivo']].sort_values('Ventas', ascending=False))
 
 except Exception as e:
-    st.error(f"Error en la estructura: {e}")
-    st.info("Verifica que la solapa 'PERFO COMERCIAL2025' sea la correcta.")
+    st.error(f"Se detectó un cambio en la estructura del archivo: {e}")
