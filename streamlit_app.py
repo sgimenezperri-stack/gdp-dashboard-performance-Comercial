@@ -33,11 +33,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARGA Y LIMPIEZA DE DATOS DINÁMICA POR AÑO ---
+# --- CARGA Y LIMPIEZA DE DATOS (PROMEDIOS REALES) ---
 @st.cache_data
 def load_data(anio_seleccionado):
     SHEET_ID = "1fXJ2UsTeOE8ipYXeP5oQYYCHRNtDJDRC" 
-    # Reemplazamos estáticamente el 2025 por la variable del año para leer la solapa correcta
     SHEET_NAME = f"PERFO%20COMERCIAL{anio_seleccionado}" 
     URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
@@ -55,7 +54,8 @@ def load_data(anio_seleccionado):
     
     for i, mes in enumerate(meses_n):
         df[f"{mes}_v"] = pd.to_numeric(df.iloc[:, idx_v[i]].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        df[f"{mes}_%"] = pd.to_numeric(df.iloc[:, idx_p[i]].astype(str).str.replace('%', '').str.replace(',', '.'), errors='coerce').fillna(0)
+        # BLINDAJE PROMEDIO REAL: No ponemos fillna(0) aquí. Los vacíos quedan como vacíos (NaN).
+        df[f"{mes}_%"] = pd.to_numeric(df.iloc[:, idx_p[i]].astype(str).str.replace('%', '').str.replace(',', '.'), errors='coerce')
 
     comp_labels = ['CRM', 'Imagen', 'Autogestión', 'Habilidad', 'Técnica']
     idx_comp = [38, 40, 42, 44, 46]
@@ -72,11 +72,13 @@ def load_data(anio_seleccionado):
     df = df[df['Vendedor'].astype(str).str.upper() != 'VENDEDOR']
     df['Iniciales'] = df['Vendedor'].apply(lambda x: "".join([n[0] for n in str(x).split() if n]).upper())
     df['Size_Marker'] = df['Total_Acumulado'].clip(lower=1).fillna(1)
-    df['Alcance_Total_Anual'] = (df['Total_Acumulado'] / (df['Objetivo_Mensual'] * 12).replace(0, 1)) * 100
+    
+    # CÁLCULO DE PROMEDIO REAL (Ignorando los meses que aún no han ocurrido)
+    columnas_porcentajes = [f"{m}_%" for m in meses_n]
+    df['Alcance_Promedio_Real'] = df[columnas_porcentajes].mean(axis=1, skipna=True).fillna(0)
     
     return df, meses_n, comp_labels
 
-# Calculamos la antigüedad basándonos en el año seleccionado
 def get_ant(fecha, anio_ref):
     if pd.isnull(fecha): return "Sin Dato"
     diff = datetime(int(anio_ref), 12, 31) - fecha
@@ -93,11 +95,9 @@ try:
     if dimension == "Performance Comercial":
         st.markdown("## Performance Comercial Cenoa")
         
-        # Filtros (Añadido 2026 por defecto)
         f1, f2, f3, f4 = st.columns([1, 2, 2, 1.5])
         with f1: anio_sel = st.selectbox("AÑO", ["2026", "2025"])
         
-        # Cargamos la data del año que seleccionó el usuario
         df_raw, lista_meses, comp_labels = load_data(anio_sel)
         
         with f2: 
@@ -165,11 +165,9 @@ try:
     elif dimension == "Matriz 9-Box Comercial":
         st.markdown("## Matriz 9-Box Comercial")
         
-        # Agregamos el selector de año en la misma fila superior
         m_f0, m_f1, m_f2, m_f3 = st.columns(4)
         with m_f0: anio_sel9 = st.selectbox("AÑO", ["2026", "2025"])
         
-        # Cargamos los datos del año seleccionado
         df_raw, lista_meses, comp_labels = load_data(anio_sel9)
         
         with m_f1: sel_p = st.selectbox("Periodo:", ["Acumulado Anual", "Todos los meses (Promedio)"] + lista_meses)
@@ -180,7 +178,8 @@ try:
         if f_emp9 != "Todas": df_9 = df_9[df_9['Empresa'] == f_emp9]
         if f_loc9 != "Todas": df_9 = df_9[df_9['Localidad'] == f_loc9]
         
-        df_9['X_Axis'] = df_9['Alcance_Total_Anual'] if sel_p in ["Acumulado Anual", "Todos los meses (Promedio)"] else df_9[f"{sel_p}_%"]
+        # APLICAMOS EL NUEVO CÁLCULO DEL EJE X
+        df_9['X_Axis'] = df_9['Alcance_Promedio_Real'] if sel_p in ["Acumulado Anual", "Todos los meses (Promedio)"] else df_9[f"{sel_p}_%"].fillna(0)
 
         quadrants = {
             "Dilema": ("rgba(255, 198, 26, 0.2)", "🟡", -5, 33.3, 66.6, 110),
@@ -229,7 +228,7 @@ try:
             df_9, x='X_Axis', y='Comp_Total_%', text='Iniciales', color='Empresa',
             size='Size_Marker', hover_name='Vendedor',
             range_x=[-5, 130], range_y=[-5, 110],
-            labels={'X_Axis': f'% Resultados ({sel_p})', 'Comp_Total_%': '% Competencias'},
+            labels={'X_Axis': f'% Resultados Promedio Real', 'Comp_Total_%': '% Competencias'},
             height=650, template="plotly_white"
         )
         fig_9.update_traces(textposition='middle center', textfont=dict(color='white', size=11), marker=dict(opacity=0.9, line=dict(width=1.5, color='DarkSlateGrey')))
@@ -278,7 +277,7 @@ try:
             """, unsafe_allow_html=True)
             
             k1, k2, k3 = st.columns(3)
-            with k1: st.markdown(f"<div class='metric-card'><h2>{v_f['X_Axis']:.1f}%</h2><p>RESULTADOS ({sel_p})</p></div>", unsafe_allow_html=True)
+            with k1: st.markdown(f"<div class='metric-card'><h2>{v_f['X_Axis']:.1f}%</h2><p>RESULTADOS PROMEDIO</p></div>", unsafe_allow_html=True)
             with k2: st.markdown(f"<div class='metric-card'><h2>{v_f['Comp_Total_%']:.1f}%</h2><p>COMPETENCIAS</p></div>", unsafe_allow_html=True)
             with k3:
                 q = "MIEMBRO CLAVE 🌟" if v_f['X_Axis'] >= 66.6 and v_f['Comp_Total_%'] >= 66.6 else "EN DESARROLLO 📈"
@@ -294,11 +293,20 @@ try:
                 st.plotly_chart(fig_c, use_container_width=True)
             with gr:
                 st.markdown("**Evolución mensual % alcance de ventas**")
-                alcances = [v_f[f"{m}_%"] for m in lista_meses]
-                fig_l = px.line(x=lista_meses, y=alcances, markers=True, text=[f"{val:.0f}%" for val in alcances])
-                fig_l.update_traces(line_color='#2ecc71', line_width=4, marker=dict(size=10, color='white', line=dict(width=2, color='#2ecc71')))
-                fig_l.update_layout(yaxis_range=[0, max(alcances)+20])
-                st.plotly_chart(fig_l, use_container_width=True)
+                
+                # --- SOLUCIÓN DE MESES COMPLETADOS ---
+                # Solo tomamos los meses que tienen un dato válido (no vacíos)
+                meses_completados = [m for m in lista_meses if pd.notnull(v_f[f"{m}_%"])]
+                alcances_reales = [v_f[f"{m}_%"] for m in meses_completados]
+                
+                if alcances_reales:
+                    fig_l = px.line(x=meses_completados, y=alcances_reales, markers=True, text=[f"{val:.0f}%" for val in alcances_reales])
+                    fig_l.update_traces(line_color='#2ecc71', line_width=4, marker=dict(size=10, color='white', line=dict(width=2, color='#2ecc71')))
+                    # Forzamos que el eje X muestre los 12 meses siempre como referencia
+                    fig_l.update_layout(yaxis_range=[0, max(alcances_reales)+20], xaxis=dict(categoryorder='array', categoryarray=lista_meses))
+                    st.plotly_chart(fig_l, use_container_width=True)
+                else:
+                    st.info("Sin datos de alcance registrados para este asesor en el año seleccionado.")
 
 except Exception as e:
     st.error(f"Falla de sistema: {e}")
