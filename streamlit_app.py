@@ -14,31 +14,72 @@ except ImportError:
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Performance Comercial Cenoa", layout="wide", page_icon="📈")
 
-# Estilos CSS - DISEÑO PROFESIONAL (SIDEBAR BLANCO Y TARJETAS)
+# Estilos CSS - DISEÑO PROFESIONAL INTACTO Y BOTÓN SUTIL
 st.markdown("""
     <style>
     .main { background-color: #f4f7f6; }
     
     /* DISEÑO PROFESIONAL DEL MENÚ LATERAL (SIDEBAR) */
-    [data-testid="stSidebar"] { background-color: #1e272e; }
+    [data-testid="stSidebar"] {
+        background-color: #1e272e; 
+    }
     [data-testid="stSidebar"] .stRadio > label {
-        font-size: 14px !important; color: #ffffff !important; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px;
+        font-size: 14px !important;
+        color: #ffffff !important; 
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
     }
     [data-testid="stSidebar"] div[role="radiogroup"] > label {
-        padding: 15px 20px; background-color: #2f3640; border-radius: 8px; margin-bottom: 10px; transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer;
+        padding: 15px 20px;
+        background-color: #2f3640;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+        border-left: 5px solid transparent;
+        cursor: pointer;
     }
     [data-testid="stSidebar"] div[role="radiogroup"] > label p, 
     [data-testid="stSidebar"] div[role="radiogroup"] > label div {
-        color: #ffffff !important; font-size: 16px !important; font-weight: 600;
+        color: #ffffff !important; 
+        font-size: 16px !important;
+        font-weight: 600;
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #353b48; border-left: 5px solid #e67e22; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #e67e22 !important; border-left: 5px solid #d35400; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+        background-color: #353b48;
+        border-left: 5px solid #e67e22; 
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
+        background-color: #e67e22 !important; 
+        border-left: 5px solid #d35400;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
+        display: none; 
+    }
+
+    /* BOTÓN SUTIL DE ACTUALIZACIÓN EN EL SIDEBAR */
+    [data-testid="stSidebar"] .stButton > button {
+        background-color: transparent !important;
+        border: 1px solid #7f8fa6 !important;
+        color: #7f8fa6 !important;
+        font-size: 12px !important;
+        height: auto;
+        padding: 8px 10px;
+        margin-top: 10px;
+        font-weight: normal;
+        border-radius: 5px;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        color: #e67e22 !important;
+        border-color: #e67e22 !important;
+        background-color: rgba(230, 126, 34, 0.1) !important;
+    }
 
     /* Estilos de Métricas y Botones Centrales */
+    .main .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; font-weight: bold; background-color: #ffffff; border: 1px solid #c8d6e5; transition: 0.3s; color: #2c3e50;}
+    .main .stButton>button:hover { border: 1px solid #2e86de; box-shadow: 0px 4px 10px rgba(0,0,0,0.08); color: #2e86de;}
+    
     [data-testid="stMetric"] { background-color: #ffffff; border-radius: 10px; padding: 15px; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
-    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; font-weight: bold; background-color: #ffffff; border: 1px solid #c8d6e5; transition: 0.3s; }
-    .stButton>button:hover { border: 1px solid #2e86de; box-shadow: 0px 4px 10px rgba(0,0,0,0.08); }
     .metric-card { background-color: #ffffff; border-radius: 10px; padding: 20px; text-align: center; border: 1px solid #e0e0e0; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); }
     .perfil-asesor { background-color: #ffffff; padding: 15px 20px; border-radius: 10px; border-left: 5px solid #e67e22; margin-bottom: 20px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05);}
     </style>
@@ -88,10 +129,9 @@ def load_data(anio_seleccionado):
     
     return df, meses_n, comp_labels
 
-# --- SOLUCIÓN DE ANTIGÜEDAD (Cálculo a la fecha actual real) ---
-def get_ant(fecha):
+def get_ant(fecha, anio_ref):
     if pd.isnull(fecha): return "Sin Dato"
-    diff = datetime.now() - fecha # Calcula contra el DÍA DE HOY
+    diff = datetime.now() - fecha
     a, m = diff.days // 365, (diff.days % 365) // 30
     if a > 0 and m > 0:
         return f"{a} años y {m} meses"
@@ -105,6 +145,12 @@ def get_ant(fecha):
 try:
     st.sidebar.markdown("<br><h2 style='text-align: center; color: white;'>GRUPO CENOA</h2><br>", unsafe_allow_html=True)
     dimension = st.sidebar.radio("MÓDULOS", ["Performance Comercial", "Matriz 9-Box Comercial"])
+
+    # --- BOTÓN SUTIL DE SINCRONIZACIÓN ---
+    st.sidebar.divider()
+    if st.sidebar.button("🔄 Sincronizar Datos con Google Sheets"):
+        st.cache_data.clear() # Esta línea es la que borra la memoria y actualiza todo
+        st.sidebar.success("¡Base de datos actualizada con éxito!")
 
     # =========================================================
     # DIMENSIÓN 1: PERFORMANCE COMERCIAL
@@ -153,8 +199,7 @@ try:
             d1, d2, d3 = st.columns([3, 1, 1])
             with d1:
                 st.subheader(v_sel)
-                # Llamada corregida sin el parámetro año
-                st.markdown(f"<span style='color:#e67e22; font-weight:bold;'>{get_ant(v_data['Fecha_Ingreso'])}</span>", unsafe_allow_html=True)
+                st.markdown(f"<span style='color:#e67e22; font-weight:bold;'>{get_ant(v_data['Fecha_Ingreso'], anio_sel)}</span>", unsafe_allow_html=True)
                 st.caption(f"Canal: {v_data['Canal']} | Empresa: {v_data['Empresa']} | Localidad: {v_data['Localidad']}")
             d2.metric("META", int(v_data['Objetivo_Mensual']))
             diff = v_data['Promedio'] - v_data['Objetivo_Mensual']
@@ -198,17 +243,16 @@ try:
         
         df_9['X_Axis'] = df_9['Alcance_Promedio_Real'] if sel_p in ["Acumulado Anual", "Todos los meses (Promedio)"] else df_9[f"{sel_p}_%"].fillna(0)
 
-        # --- EMOJIS UNIVERSALES 100% COMPATIBLES ---
         quadrants = {
-            "Dilema": ("rgba(255, 198, 26, 0.2)", "❓", -5, 33.3, 66.6, 110),
-            "E. Emergente": ("rgba(144, 238, 144, 0.3)", "🌱", 33.3, 66.6, 66.6, 110),
-            "ESTRELLA": ("rgba(46, 204, 113, 0.3)", "🌟", 66.6, 130, 66.6, 110),
-            "Cuestionable": ("rgba(243, 156, 18, 0.2)", "🔎", -5, 33.3, 33.3, 66.6),
-            "Core Player": ("rgba(189, 195, 199, 0.2)", "🎯", 33.3, 66.6, 33.3, 66.6),
+            "Dilema": ("rgba(255, 198, 26, 0.2)", "💡", -5, 33.3, 66.6, 110),
+            "E. Emergente": ("rgba(144, 238, 144, 0.3)", "📈", 33.3, 66.6, 66.6, 110),
+            "ESTRELLA": ("rgba(46, 204, 113, 0.3)", "⭐", 66.6, 130, 66.6, 110),
+            "Cuestionable": ("rgba(243, 156, 18, 0.2)", "⚠️", -5, 33.3, 33.3, 66.6),
+            "Core Player": ("rgba(189, 195, 199, 0.2)", "⚙️", 33.3, 66.6, 33.3, 66.6),
             "High Performer": ("rgba(46, 204, 113, 0.15)", "🚀", 66.6, 130, 33.3, 66.6),
-            "Bajo Rendimiento": ("rgba(231, 76, 60, 0.2)", "🔻", -5, 33.3, -5, 33.3),
-            "En Riesgo": ("rgba(230, 126, 34, 0.2)", "🔔", 33.3, 66.6, -5, 33.3),
-            "Eficaz": ("rgba(39, 174, 96, 0.15)", "✔️", 66.6, 130, -5, 33.3)
+            "Bajo Rendimiento": ("rgba(231, 76, 60, 0.2)", "📉", -5, 33.3, -5, 33.3),
+            "En Riesgo": ("rgba(230, 126, 34, 0.2)", "🚨", 33.3, 66.6, -5, 33.3),
+            "Eficaz": ("rgba(39, 174, 96, 0.15)", "✅", 66.6, 130, -5, 33.3)
         }
 
         st.write("**Visualizar Listado por Categoría Comercial:**")
@@ -286,7 +330,7 @@ try:
             <div class='perfil-asesor'>
                 <h3 style='margin-bottom: 5px; color: #2c3e50;'>{v_f['Vendedor']}</h3>
                 <p style='font-size: 15px; margin-bottom: 0px;'>
-                    <b>Antigüedad:</b> <span style='color:#e67e22;'>{get_ant(v_f['Fecha_Ingreso'])}</span> &nbsp;|&nbsp; 
+                    <b>Antigüedad:</b> <span style='color:#e67e22;'>{get_ant(v_f['Fecha_Ingreso'], anio_sel9)}</span> &nbsp;|&nbsp; 
                     <b>Tipo/Canal:</b> {v_f['Canal']} &nbsp;|&nbsp; 
                     <b>Empresa:</b> {v_f['Empresa']} &nbsp;|&nbsp; 
                     <b>Localidad:</b> {v_f['Localidad']}
