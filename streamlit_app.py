@@ -15,7 +15,7 @@ except ImportError:
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cenoa BI - Performance y Talento", layout="wide", page_icon="📈")
 
-# Estilos CSS - Estética Premium y Botones 9-Box
+# Estilos CSS - Estética Premium
 st.markdown("""
     <style>
     .main { background-color: #f4f7f6; }
@@ -42,8 +42,10 @@ def load_data():
     }
     
     meses_n = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    idx_v = [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
-    idx_p = [10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
+    
+    # ¡SOLUCIÓN APLICADA AQUÍ! Índices correctos para Ventas (I, K, M...) y Alcance % (J, L, N...)
+    idx_v = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30] 
+    idx_p = [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
     
     for i, mes in enumerate(meses_n):
         df[f"{mes}_v"] = pd.to_numeric(df.iloc[:, idx_v[i]].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -79,7 +81,7 @@ try:
     dimension = st.sidebar.radio("MENÚ DE NAVEGACIÓN", ["Performance Comercial", "Matriz 9-Box Comercial"])
 
     # =========================================================
-    # DIMENSIÓN 1: PERFORMANCE COMERCIAL (BARRAS RESTAURADAS)
+    # DIMENSIÓN 1: PERFORMANCE COMERCIAL (GRÁFICOS RESTAURADOS)
     # =========================================================
     if dimension == "Performance Comercial":
         st.markdown("### 📊 Performance Comercial Grupo Cenoa")
@@ -99,14 +101,14 @@ try:
         if sel_loc != "Todas": df_p = df_p[df_p['Localidad'] == sel_loc]
         with f4: st.metric("VENDEDORES", len(df_p))
 
-        # Gráficos de Resumen (BARRAS SOLUCIONADAS)
+        # Gráficos de Resumen (BARRAS COMPLETAMENTE RESTAURADAS)
         c1, c2 = st.columns([1.5, 1])
         with c1:
             st.markdown("**Cantidad de Operaciones por Empresa**")
             df_m = df_p.groupby('Empresa')[[f"{m}_v" for m in lista_meses]].sum().reset_index().melt(id_vars='Empresa', var_name='Mes', value_name='Ventas')
             df_m['Mes'] = df_m['Mes'].str.replace('_v', '')
             fig_g = px.bar(df_m, x='Mes', y='Ventas', color='Empresa', barmode='group', text_auto='.0f')
-            fig_g.update_layout(xaxis=dict(type='category', categoryarray=lista_meses)) # Forzar eje de meses
+            fig_g.update_layout(xaxis=dict(type='category', categoryarray=lista_meses)) 
             st.plotly_chart(fig_g, use_container_width=True)
             
         with c2:
@@ -116,7 +118,7 @@ try:
             st.plotly_chart(fig_top, use_container_width=True)
 
         st.divider()
-        # Análisis Individual (BARRAS SOLUCIONADAS)
+        # Análisis Individual (GRÁFICO EVOLUTIVO RESTAURADO)
         col_l, col_r = st.columns([1, 2.5])
         with col_l:
             v_sel = st.selectbox("🔎 Seleccionar Vendedor:", sorted(df_p['Vendedor'].unique()))
@@ -151,7 +153,7 @@ try:
             st.plotly_chart(px.box(df_p, x='Empresa', y='Promedio', points="all", color='Empresa', hover_data=['Vendedor']), use_container_width=True)
 
     # =========================================================
-    # DIMENSIÓN 2: MATRIZ 9-BOX (ESTÉTICA, BOTONES Y CLICK)
+    # DIMENSIÓN 2: MATRIZ 9-BOX
     # =========================================================
     elif dimension == "Matriz 9-Box Comercial":
         st.markdown("### 🎯 Matriz de Talento 9-Box")
@@ -180,10 +182,8 @@ try:
             if b_col.button(cats[i], use_container_width=True): 
                 st.session_state.cat_filtrada = cats[i]
 
-        # Desplegar tabla si se hizo click en un botón
         if st.session_state.cat_filtrada:
             st.markdown(f"#### 📋 Asesores en Categoría: {st.session_state.cat_filtrada}")
-            # Lógica de categorías
             cat_map = {
                 "Dilema": (df_9['X_Axis'] < 33.3) & (df_9['Comp_Total_%'] > 66.6),
                 "E. Emergente": (df_9['X_Axis'].between(33.3, 66.6)) & (df_9['Comp_Total_%'] > 66.6),
@@ -199,7 +199,7 @@ try:
             st.dataframe(df_detalle[['Vendedor', 'Empresa', 'Localidad', 'X_Axis', 'Comp_Total_%']].rename(columns={'X_Axis': '% Resultados', 'Comp_Total_%': '% Competencias'}), use_container_width=True)
             st.divider()
 
-        # 2. GRÁFICO MATRIZ MEJORADO ESTÉTICAMENTE
+        # 2. GRÁFICO MATRIZ MEJORADO
         fig_9 = px.scatter(
             df_9, x='X_Axis', y='Comp_Total_%', text='Iniciales', color='Empresa',
             size='Size_Marker', hover_name='Vendedor',
@@ -207,14 +207,11 @@ try:
             labels={'X_Axis': f'% Resultados ({sel_p})', 'Comp_Total_%': '% Competencias'},
             height=650, template="plotly_white"
         )
-        # Formato de las esferas
         fig_9.update_traces(textposition='middle center', textfont=dict(color='white', size=11), marker=dict(opacity=0.85, line=dict(width=1.5, color='DarkSlateGrey')))
         
-        # Fondos de colores para los cuadrantes principales
-        fig_9.add_shape(type="rect", x0=-5, y0=-5, x1=33.3, y1=33.3, fillcolor="rgba(255, 99, 71, 0.1)", layer="below", line_width=0) # Rojo: Bajo Rend
-        fig_9.add_shape(type="rect", x0=66.6, y0=66.6, x1=130, y1=110, fillcolor="rgba(46, 204, 113, 0.1)", layer="below", line_width=0) # Verde: Estrella
+        fig_9.add_shape(type="rect", x0=-5, y0=-5, x1=33.3, y1=33.3, fillcolor="rgba(255, 99, 71, 0.1)", layer="below", line_width=0)
+        fig_9.add_shape(type="rect", x0=66.6, y0=66.6, x1=130, y1=110, fillcolor="rgba(46, 204, 113, 0.1)", layer="below", line_width=0)
         
-        # Líneas de división
         fig_9.add_vline(x=33.3, line_dash="dash", line_color="rgba(0,0,0,0.2)")
         fig_9.add_vline(x=66.6, line_dash="dash", line_color="rgba(0,0,0,0.2)")
         fig_9.add_hline(y=33.3, line_dash="dash", line_color="rgba(0,0,0,0.2)")
@@ -243,11 +240,9 @@ try:
         st.markdown("### 📋 Ficha Técnica de Desempeño")
         v_ficha = st.selectbox("🔎 Buscador Manual de Asesor:", opciones_vendedores, index=idx_defecto)
 
-        # 4. DESGLOSE DE FICHA TÉCNICA
         if v_ficha != "-- Seleccionar Asesor --":
             v_f = df_9[df_9['Vendedor'] == v_ficha].iloc[0]
             
-            # Tarjetas Superiores
             k1, k2, k3 = st.columns(3)
             with k1: st.markdown(f"<div class='metric-card'><h2>{v_f['X_Axis']:.1f}%</h2><p>RESULTADOS ({sel_p})</p></div>", unsafe_allow_html=True)
             with k2: st.markdown(f"<div class='metric-card'><h2>{v_f['Comp_Total_%']:.1f}%</h2><p>COMPETENCIAS</p></div>", unsafe_allow_html=True)
@@ -256,12 +251,11 @@ try:
                 color = "#2ecc71" if "CLAVE" in q else "#e67e22"
                 st.markdown(f"<div class='metric-card' style='border-top: 5px solid {color};'><h2 style='color:{color};'>{q}</h2><p>ESTADO ACTUAL</p></div>", unsafe_allow_html=True)
 
-            # Gráficos Radar y Línea
             gl, gr = st.columns([1, 1.5])
             with gl:
                 st.markdown("**Desglose de Competencias**")
                 fig_c = px.bar(x=[v_f[c] for c in comp_labels], y=comp_labels, orientation='h', color=comp_labels, text_auto='.1f')
-                fig_c.update_layout(showlegend=False, xaxis_range=[0, 25]) # 20% max por competencia
+                fig_c.update_layout(showlegend=False, xaxis_range=[0, 25])
                 st.plotly_chart(fig_c, use_container_width=True)
             with gr:
                 st.markdown("**Evolución mensual % alcance de ventas**")
