@@ -20,6 +20,28 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# Función para dar formato a la antigüedad (Lógica solicitada)
+def format_antiguedad(fecha_ingreso):
+    if pd.isnull(fecha_ingreso):
+        return "Sin dato"
+    
+    hoy = datetime(2025, 12, 31) # Referencia al cierre de los datos
+    diff = hoy - fecha_ingreso
+    anios = diff.days // 365
+    meses = (diff.days % 365) // 30
+    
+    # Construcción de la frase
+    partes = []
+    if anios > 0:
+        partes.append(f"{anios} {'año' if anios == 1 else 'años'}")
+    if meses > 0:
+        partes.append(f"{meses} {'mes' if meses == 1 else 'meses'}")
+    
+    if not partes:
+        return "Menos de un mes"
+    
+    return " y ".join(partes)
+
 # --- CARGA DE DATOS ---
 SHEET_ID = "1fXJ2UsTeOE8ipYXeP5oQYYCHRNtDJDRC" 
 SHEET_NAME = "PERFO%20COMERCIAL2025"
@@ -29,10 +51,10 @@ URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sh
 def load_data():
     df = pd.read_csv(URL)
     
-    # 1. Mapeo por Índice (B=1, D=3, E=4, F=5, G=6, H=7, AG=32, AH=33)
+    # 1. Mapeo por Índice (B=1, C=2 [NUEVO], E=4, F=5, G=6, H=7, AG=32, AH=33)
     mapping = {
         df.columns[1]: 'Vendedor', 
-        df.columns[3]: 'Fecha_Ingreso',
+        df.columns[2]: 'Fecha_Ingreso', # Ahora tomamos la columna C
         df.columns[4]: 'Empresa', 
         df.columns[5]: 'Localidad',
         df.columns[6]: 'Canal', 
@@ -55,7 +77,7 @@ def load_data():
     for c in ['Objetivo_Mensual', 'Total_Acumulado', 'Promedio']:
         df[c] = pd.to_numeric(df[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
     
-    # Limpieza de fechas (Columna D) - Forzamos formato día/mes/año
+    # Limpieza de fechas (Columna C)
     df['Fecha_Ingreso'] = pd.to_datetime(df['Fecha_Ingreso'], dayfirst=True, errors='coerce')
     
     return df, nombres_meses
@@ -71,16 +93,16 @@ try:
         st.selectbox("AÑO", ["2025"])
 
     with f_col2:
-        # Ajuste 2: Limpiamos la lista para que no aparezca el texto "Empresa" como opción
+        # Filtro limpio (sin la palabra "Empresa" en la lista)
         opciones_empresa = [x for x in sorted(df_raw['Empresa'].dropna().unique().tolist()) if str(x).upper() != "EMPRESA"]
         f_empresa = st.selectbox("EMPRESA", ["Todas"] + opciones_empresa)
 
     with f_col3:
-        # Ajuste 2: Limpiamos la lista para que no aparezca el texto "Localidad" como opción
+        # Filtro limpio (sin la palabra "Localidad" en la lista)
         opciones_loc = [x for x in sorted(df_raw['Localidad'].dropna().unique().tolist()) if str(x).upper() != "LOCALIDAD"]
         f_localidad = st.selectbox("LOCALIDAD", ["Todas"] + opciones_loc)
 
-    # --- APLICAR FILTROS PARA DOTACIÓN DINÁMICA ---
+    # --- APLICAR FILTROS ANTES DE LA DOTACIÓN ---
     df_filtered = df_raw.copy()
     if f_empresa != "Todas":
         df_filtered = df_filtered[df_filtered['Empresa'] == f_empresa]
@@ -88,7 +110,7 @@ try:
         df_filtered = df_filtered[df_filtered['Localidad'] == f_localidad]
 
     with f_col4:
-        # Ajuste 1: Dotación alineada y dinámica
+        # Dotación dinámica alineada
         st.metric("VENDEDORES", len(df_filtered))
 
     # --- 2. FILA DE GRÁFICOS GENERALES ---
@@ -126,16 +148,9 @@ try:
         with d_cab:
             st.subheader(vendedor_sel)
             
-            # Ajuste 1: Cálculo y visualización de ANTIGÜEDAD (Columna D)
-            if pd.notnull(v_data['Fecha_Ingreso']):
-                fecha_ref = datetime(2025, 12, 31) # Referencia al cierre de los datos
-                ant = fecha_ref - v_data['Fecha_Ingreso']
-                anios = ant.days // 365
-                meses_ant = (ant.days % 365) // 30
-                # Mostramos antigüedad de forma destacada en naranja
-                st.markdown(f"🗓️ **Antigüedad:** <span style='color:#e67e22; font-size:20px; font-weight:bold;'>{max(0, anios)} Años {max(0, meses_ant)} Meses</span>", unsafe_allow_html=True)
-            else:
-                st.markdown("🗓️ **Antigüedad:** <span style='color:grey;'>Dato no disponible</span>", unsafe_allow_html=True)
+            # --- AJUSTE SOLICITADO: Antigüedad formateada ---
+            texto_antiguedad = format_antiguedad(v_data['Fecha_Ingreso'])
+            st.markdown(f"🗓️ **Antigüedad:** <span style='color:#e67e22; font-size:20px; font-weight:bold;'>{texto_antiguedad}</span>", unsafe_allow_html=True)
             
             st.write(f"Canal: {v_data['Canal']} | Empresa: {v_data['Empresa']} | Localidad: {v_data['Localidad']}")
 
