@@ -3,13 +3,13 @@ import pandas as pd
 import plotly.express as px
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Cenoa Analytics 2025", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Cenoa Analytics 2025 - Precise", layout="wide", page_icon="📊")
 
-# Estilo para mejorar la visualización de métricas
+# Estilo visual para KPIs
 st.markdown("""
     <style>
-    [data-testid="stMetricValue"] { font-size: 28px; color: #1f77b4; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0; }
+    [data-testid="stMetricValue"] { font-size: 32px; font-weight: bold; color: #004a99; }
+    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -19,106 +19,108 @@ SHEET_NAME = "PERFO%20COMERCIAL2025"
 URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 @st.cache_data
-def load_data_2025():
+def load_data_final():
     df = pd.read_csv(URL)
-    df.columns = df.columns.str.strip()
     
-    # Mapeo por posición (B=1, D=3, E=4, F=5, G=6)
-    rename_dict = {
+    # MAPEADO QUIRÚRGICO POR POSICIÓN (Basado en tus indicaciones)
+    # Col B(1): Vendedor | Col D(3): Fecha | Col E(4): Empresa | Col F(5): Loc | Col G(6): Tipo
+    # Col H(7): Objetivo | Col AG(32): Total Anual | Col AH(33): Promedio
+    
+    mapping = {
         df.columns[1]: 'Vendedor',
         df.columns[3]: 'Fecha Ingreso',
         df.columns[4]: 'Empresa',
         df.columns[5]: 'Localidad',
-        df.columns[6]: 'Tipo de Venta'
+        df.columns[6]: 'Tipo de Venta',
+        df.columns[7]: 'Objetivo Anual',
+        df.columns[32]: 'Total Ventas',
+        df.columns[33]: 'Promedio Mensual'
     }
-    df = df.rename(columns=rename_dict)
     
-    # Auto-detección de Ventas y Objetivo (posiciones H=7 e I=8 aprox)
-    col_ventas = df.columns[7]
-    col_obj = df.columns[8]
-    df = df.rename(columns={col_ventas: 'Ventas', col_obj: 'Objetivo'})
+    df = df.rename(columns=mapping)
     
-    # Limpieza numérica
-    for c in ['Ventas', 'Objetivo']:
+    # Selección de solo las columnas necesarias para el análisis
+    cols_interes = ['Vendedor', 'Fecha Ingreso', 'Empresa', 'Localidad', 'Tipo de Venta', 'Objetivo Anual', 'Total Ventas', 'Promedio Mensual']
+    df = df[cols_interes].copy()
+
+    # Limpieza numérica (Convertir comas a puntos y manejar nulos)
+    for c in ['Objetivo Anual', 'Total Ventas', 'Promedio Mensual']:
         df[c] = pd.to_numeric(df[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
     
     return df
 
 try:
-    df = load_data_2025()
+    df = load_data_final()
 
-    # --- TÍTULO PRINCIPAL ---
-    st.title("📊 Performance Comercial Grupo Cenoa")
-    st.caption("Dashboard de Análisis de Ventas y Cumplimiento - Ciclo 2025")
+    st.title("🚀 Business Intelligence: Grupo Cenoa 2025")
+    st.caption("Análisis acumulado de performance comercial (Enero - Diciembre)")
 
-    # --- FILTROS LIMPIOS (Sin referencias de columnas) ---
-    st.sidebar.header("🎯 Panel de Filtros")
+    # --- PANEL DE FILTROS ---
+    st.sidebar.header("🔍 Filtros de Negocio")
     
     with st.sidebar:
         f_empresa = st.multiselect("Filtrar por Empresa", options=sorted(df['Empresa'].dropna().unique()), default=df['Empresa'].dropna().unique())
         f_localidad = st.multiselect("Filtrar por Localidad", options=sorted(df['Localidad'].dropna().unique()), default=df['Localidad'].dropna().unique())
         f_tipo = st.multiselect("Filtrar por Tipo de Venta", options=sorted(df['Tipo de Venta'].dropna().unique()), default=df['Tipo de Venta'].dropna().unique())
-        f_vendedor = st.multiselect("Buscar Vendedor Específico", options=sorted(df['Vendedor'].dropna().unique()))
+        f_vendedor = st.sidebar.text_input("🔍 Buscar Vendedor por nombre")
 
     # Lógica de filtrado
     mask = df['Empresa'].isin(f_empresa) & df['Localidad'].isin(f_localidad) & df['Tipo de Venta'].isin(f_tipo)
     if f_vendedor:
-        mask = mask & df['Vendedor'].isin(f_vendedor)
+        mask = mask & df['Vendedor'].str.contains(f_vendedor, case=False, na=False)
     
     df_filtered = df[mask].copy()
 
-    # --- INDICADORES ---
+    # --- KPIs PRINCIPALES ---
     c1, c2, c3, c4 = st.columns(4)
-    total_vta = df_filtered['Ventas'].sum()
-    total_obj = df_filtered['Objetivo'].sum()
-    cumpl_prom = (total_vta / total_obj * 100) if total_obj > 0 else 0
     
-    c1.metric("Ventas Totales", f"$ {total_vta:,.0f}")
-    c2.metric("Objetivo Total", f"$ {total_obj:,.0f}")
-    c3.metric("% Cumplimiento", f"{cumpl_prom:.1f}%")
-    c4.metric("Efectivos", len(df_filtered))
+    total_acumulado = df_filtered['Total Ventas'].sum()
+    meta_acumulada = df_filtered['Objetivo Anual'].sum()
+    alcance_real = (total_acumulado / meta_acumulada * 100) if meta_acumulada > 0 else 0
+    promedio_vendedores = df_filtered['Promedio Mensual'].mean()
+
+    c1.metric("Ventas Acumuladas", f"{total_acumulado:,.0f}")
+    c2.metric("Meta Total", f"{meta_acumulada:,.0f}")
+    c3.metric("% Alcance Anual", f"{alcance_real:.1f}%")
+    c4.metric("Promedio de Venta", f"{promedio_vendedores:,.1f}")
 
     st.divider()
 
-    # --- SECCIÓN: RANKING DE VENTAS ---
-    st.subheader("🏆 Ranking de Ventas por Asesor")
+    # --- RANKING DE VENTAS (Col AG) ---
+    st.subheader("🏆 Ranking de Ventas Totales por Asesor")
     
-    # Preparamos el ranking
-    ranking_df = df_filtered.sort_values('Ventas', ascending=True) # Ascending True para que el mayor quede arriba en el bar chart horizontal
-
-    fig_ranking = px.bar(
-        ranking_df,
-        x='Ventas',
+    ranking_data = df_filtered.sort_values('Total Ventas', ascending=True).tail(15) # Top 15 para no saturar
+    
+    fig_rank = px.bar(
+        ranking_data,
+        x='Total Ventas',
         y='Vendedor',
         orientation='h',
-        text='Ventas',
-        color='Ventas',
-        color_continuous_scale='Blues',
-        labels={'Ventas': 'Volumen de Ventas', 'Vendedor': 'Asesor Comercial'}
+        text='Total Ventas',
+        color='Total Ventas',
+        color_continuous_scale='Greens',
+        labels={'Total Ventas': 'Ventas Acumuladas (Col AG)', 'Vendedor': 'Asesor'}
     )
-    
-    fig_ranking.update_traces(texttemplate='%{text:.2s}', textposition='outside')
-    fig_ranking.update_layout(showlegend=False, height=max(400, len(ranking_df) * 30)) # Altura dinámica según cantidad de vendedores
-    
-    st.plotly_chart(fig_ranking, use_container_width=True)
+    fig_rank.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
+    st.plotly_chart(fig_rank, use_container_width=True)
 
-    # --- ANÁLISIS SECUNDARIO ---
+    # --- COMPARATIVA: OBJETIVO VS REAL ---
     col_a, col_b = st.columns(2)
     
     with col_a:
-        st.subheader("📍 Ventas por Localidad")
-        fig_loc = px.pie(df_filtered, values='Ventas', names='Localidad', hole=0.4, color_discrete_sequence=px.colors.qualitative.Safe)
+        st.subheader("📍 Desempeño por Localidad")
+        fig_loc = px.sunburst(df_filtered, path=['Localidad', 'Empresa'], values='Total Ventas', color='Total Ventas', color_continuous_scale='RdBu')
         st.plotly_chart(fig_loc, use_container_width=True)
 
     with col_b:
-        st.subheader("🏢 Mix de Ventas por Empresa")
-        fig_emp = px.bar(df_filtered.groupby('Empresa')['Ventas'].sum().reset_index(), 
-                         x='Empresa', y='Ventas', color='Empresa', text_auto='.2s')
-        st.plotly_chart(fig_emp, use_container_width=True)
+        st.subheader("🎯 Consistencia (Promedio Mensual)")
+        # Gráfico para ver quién mantiene el mejor promedio (Col AH)
+        fig_avg = px.box(df_filtered, x='Empresa', y='Promedio Mensual', points="all", color="Empresa")
+        st.plotly_chart(fig_avg, use_container_width=True)
 
-    # Tabla detallada
-    with st.expander("📋 Ver detalle de datos filtrados"):
-        st.dataframe(df_filtered[['Vendedor', 'Empresa', 'Localidad', 'Tipo de Venta', 'Ventas', 'Objetivo']].sort_values('Ventas', ascending=False))
+    # --- TABLA DETALLADA ---
+    with st.expander("📄 Ver detalle técnico de columnas (B, D, E, F, G, H, AG, AH)"):
+        st.dataframe(df_filtered.sort_values('Total Ventas', ascending=False))
 
 except Exception as e:
-    st.error(f"Se detectó un cambio en la estructura del archivo: {e}")
+    st.error(f"Error de estructura: {e}")
