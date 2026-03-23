@@ -10,7 +10,7 @@ try:
     CLICK_HABILITADO = True
 except ImportError:
     CLICK_HABILITADO = False
-    st.warning("⚠️ Para que el click en las esferas funcione, detén la app y ejecuta en tu terminal: pip install streamlit-plotly-events")
+    # SE ELIMINÓ EL CARTEL AMARILLO DE ADVERTENCIA AQUÍ
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cenoa BI - Performance y Talento", layout="wide", page_icon="📈")
@@ -43,7 +43,7 @@ def load_data():
     
     meses_n = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     
-    # ¡SOLUCIÓN APLICADA AQUÍ! Índices correctos para Ventas (I, K, M...) y Alcance % (J, L, N...)
+    # Índices correctos para Ventas (I, K, M...) y Alcance % (J, L, N...)
     idx_v = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30] 
     idx_p = [9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31]
     
@@ -81,7 +81,7 @@ try:
     dimension = st.sidebar.radio("MENÚ DE NAVEGACIÓN", ["Performance Comercial", "Matriz 9-Box Comercial"])
 
     # =========================================================
-    # DIMENSIÓN 1: PERFORMANCE COMERCIAL (GRÁFICOS RESTAURADOS)
+    # DIMENSIÓN 1: PERFORMANCE COMERCIAL
     # =========================================================
     if dimension == "Performance Comercial":
         st.markdown("### 📊 Performance Comercial Grupo Cenoa")
@@ -101,7 +101,7 @@ try:
         if sel_loc != "Todas": df_p = df_p[df_p['Localidad'] == sel_loc]
         with f4: st.metric("VENDEDORES", len(df_p))
 
-        # Gráficos de Resumen (BARRAS COMPLETAMENTE RESTAURADAS)
+        # Gráficos de Resumen
         c1, c2 = st.columns([1.5, 1])
         with c1:
             st.markdown("**Cantidad de Operaciones por Empresa**")
@@ -118,7 +118,7 @@ try:
             st.plotly_chart(fig_top, use_container_width=True)
 
         st.divider()
-        # Análisis Individual (GRÁFICO EVOLUTIVO RESTAURADO)
+        # Análisis Individual
         col_l, col_r = st.columns([1, 2.5])
         with col_l:
             v_sel = st.selectbox("🔎 Seleccionar Vendedor:", sorted(df_p['Vendedor'].unique()))
@@ -133,7 +133,7 @@ try:
             diff = v_data['Promedio'] - v_data['Objetivo_Mensual']
             d3.metric("PROM", f"{v_data['Promedio']:.1f}", delta=f"{diff:.1f}", delta_color="normal" if diff >= 0 else "inverse")
             
-            # Gráfico Individual Blindado
+            # Gráfico Individual
             y_vals = [float(v_data[f"{m}_v"]) for m in lista_meses]
             text_vals = [f"{v:.0f}" for v in y_vals]
             fig_evol = go.Figure()
@@ -182,6 +182,7 @@ try:
             if b_col.button(cats[i], use_container_width=True): 
                 st.session_state.cat_filtrada = cats[i]
 
+        # DESPLEGAR TABLA CON BOTÓN DE CERRAR
         if st.session_state.cat_filtrada:
             st.markdown(f"#### 📋 Asesores en Categoría: {st.session_state.cat_filtrada}")
             cat_map = {
@@ -197,9 +198,16 @@ try:
             }
             df_detalle = df_9[cat_map[st.session_state.cat_filtrada]]
             st.dataframe(df_detalle[['Vendedor', 'Empresa', 'Localidad', 'X_Axis', 'Comp_Total_%']].rename(columns={'X_Axis': '% Resultados', 'Comp_Total_%': '% Competencias'}), use_container_width=True)
+            
+            # BOTÓN PARA CERRAR EL LISTADO
+            col_cerrar, _ = st.columns([1, 4])
+            with col_cerrar:
+                if st.button("❌ Cerrar Listado", key="btn_cerrar"):
+                    st.session_state.cat_filtrada = None
+                    st.rerun() # Actualiza la pantalla para ocultar la tabla
             st.divider()
 
-        # 2. GRÁFICO MATRIZ MEJORADO
+        # 2. GRÁFICO MATRIZ
         fig_9 = px.scatter(
             df_9, x='X_Axis', y='Comp_Total_%', text='Iniciales', color='Empresa',
             size='Size_Marker', hover_name='Vendedor',
@@ -209,8 +217,8 @@ try:
         )
         fig_9.update_traces(textposition='middle center', textfont=dict(color='white', size=11), marker=dict(opacity=0.85, line=dict(width=1.5, color='DarkSlateGrey')))
         
-        fig_9.add_shape(type="rect", x0=-5, y0=-5, x1=33.3, y1=33.3, fillcolor="rgba(255, 99, 71, 0.1)", layer="below", line_width=0)
-        fig_9.add_shape(type="rect", x0=66.6, y0=66.6, x1=130, y1=110, fillcolor="rgba(46, 204, 113, 0.1)", layer="below", line_width=0)
+        fig_9.add_shape(type="rect", x0=-5, y0=-5, x1=33.3, y1=33.3, fillcolor="rgba(255, 99, 71, 0.1)", layer="below", line_width=0) 
+        fig_9.add_shape(type="rect", x0=66.6, y0=66.6, x1=130, y1=110, fillcolor="rgba(46, 204, 113, 0.1)", layer="below", line_width=0) 
         
         fig_9.add_vline(x=33.3, line_dash="dash", line_color="rgba(0,0,0,0.2)")
         fig_9.add_vline(x=66.6, line_dash="dash", line_color="rgba(0,0,0,0.2)")
@@ -240,6 +248,7 @@ try:
         st.markdown("### 📋 Ficha Técnica de Desempeño")
         v_ficha = st.selectbox("🔎 Buscador Manual de Asesor:", opciones_vendedores, index=idx_defecto)
 
+        # 4. DESGLOSE DE FICHA TÉCNICA
         if v_ficha != "-- Seleccionar Asesor --":
             v_f = df_9[df_9['Vendedor'] == v_ficha].iloc[0]
             
@@ -255,7 +264,7 @@ try:
             with gl:
                 st.markdown("**Desglose de Competencias**")
                 fig_c = px.bar(x=[v_f[c] for c in comp_labels], y=comp_labels, orientation='h', color=comp_labels, text_auto='.1f')
-                fig_c.update_layout(showlegend=False, xaxis_range=[0, 25])
+                fig_c.update_layout(showlegend=False, xaxis_range=[0, 25]) 
                 st.plotly_chart(fig_c, use_container_width=True)
             with gr:
                 st.markdown("**Evolución mensual % alcance de ventas**")
