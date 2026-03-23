@@ -14,7 +14,7 @@ except ImportError:
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Performance Comercial Cenoa", layout="wide", page_icon="📈")
 
-# Estilos CSS - DISEÑO PROFESIONAL (SIDEBAR LETRAS BLANCAS Y TARJETAS)
+# Estilos CSS - DISEÑO PROFESIONAL (SIDEBAR BLANCO Y TARJETAS)
 st.markdown("""
     <style>
     /* Fondo principal */
@@ -32,31 +32,36 @@ st.markdown("""
         letter-spacing: 1px;
         margin-bottom: 15px;
     }
-    /* Letras blancas para las opciones del menú */
+    /* Contenedor de las opciones del menú */
     [data-testid="stSidebar"] div[role="radiogroup"] > label {
         padding: 15px 20px;
         background-color: #2f3640;
         border-radius: 8px;
         margin-bottom: 10px;
-        font-size: 16px !important;
-        font-weight: 600;
-        color: #ffffff !important; 
         transition: all 0.3s ease;
         border-left: 5px solid transparent;
         cursor: pointer;
     }
+    /* FORZAR LETRAS BLANCAS en el texto de las opciones (módulos) */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p, 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label div {
+        color: #ffffff !important; 
+        font-size: 16px !important;
+        font-weight: 600;
+    }
+    /* Efecto Hover (pasar el mouse) */
     [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
         background-color: #353b48;
         border-left: 5px solid #e67e22; /* Naranja Cenoa */
-        color: #ffffff !important;
     }
+    /* Módulo Activo / Seleccionado */
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #e67e22 !important; /* Activo en Naranja Cenoa */
-        color: #ffffff !important;
+        background-color: #e67e22 !important; 
         border-left: 5px solid #d35400;
     }
+    /* Ocultar el circulito nativo */
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
-        display: none; /* Oculta el circulito nativo */
+        display: none; 
     }
 
     /* Estilos de Métricas y Botones Centrales */
