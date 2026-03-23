@@ -18,13 +18,46 @@ st.set_page_config(page_title="Performance Comercial Cenoa", layout="wide", page
 st.markdown("""
     <style>
     .main { background-color: #f4f7f6; }
-    [data-testid="stSidebar"] { background-color: #1e272e; }
-    [data-testid="stSidebar"] .stRadio > label { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 15px 20px; background-color: #2f3640; border-radius: 8px; margin-bottom: 10px; transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label p, [data-testid="stSidebar"] div[role="radiogroup"] > label div { color: #ffffff !important; font-size: 16px !important; font-weight: 600; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #353b48; border-left: 5px solid #e67e22; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #e67e22 !important; border-left: 5px solid #d35400; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none; }
+    
+    /* DISEÑO PROFESIONAL DEL MENÚ LATERAL (SIDEBAR) */
+    [data-testid="stSidebar"] {
+        background-color: #1e272e; /* Azul noche elegante */
+    }
+    [data-testid="stSidebar"] .stRadio > label {
+        font-size: 14px !important;
+        color: #ffffff !important; 
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label {
+        padding: 15px 20px;
+        background-color: #2f3640;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+        border-left: 5px solid transparent;
+        cursor: pointer;
+    }
+    /* FORZAR LETRAS BLANCAS en el texto de las opciones (módulos) */
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p, 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label div {
+        color: #ffffff !important; 
+        font-size: 16px !important;
+        font-weight: 600;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+        background-color: #353b48;
+        border-left: 5px solid #e67e22; 
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
+        background-color: #e67e22 !important; 
+        border-left: 5px solid #d35400;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
+        display: none; 
+    }
+
     [data-testid="stMetric"] { background-color: #ffffff; border-radius: 10px; padding: 15px; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
     .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; font-weight: bold; background-color: #ffffff; border: 1px solid #c8d6e5; transition: 0.3s; }
     .stButton>button:hover { border: 1px solid #2e86de; box-shadow: 0px 4px 10px rgba(0,0,0,0.08); }
@@ -33,7 +66,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARGA Y LIMPIEZA DE DATOS (PROMEDIOS REALES) ---
+# --- CARGA Y LIMPIEZA DE DATOS ---
 @st.cache_data
 def load_data(anio_seleccionado):
     SHEET_ID = "1fXJ2UsTeOE8ipYXeP5oQYYCHRNtDJDRC" 
@@ -54,7 +87,6 @@ def load_data(anio_seleccionado):
     
     for i, mes in enumerate(meses_n):
         df[f"{mes}_v"] = pd.to_numeric(df.iloc[:, idx_v[i]].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
-        # BLINDAJE PROMEDIO REAL: No ponemos fillna(0) aquí. Los vacíos quedan como vacíos (NaN).
         df[f"{mes}_%"] = pd.to_numeric(df.iloc[:, idx_p[i]].astype(str).str.replace('%', '').str.replace(',', '.'), errors='coerce')
 
     comp_labels = ['CRM', 'Imagen', 'Autogestión', 'Habilidad', 'Técnica']
@@ -73,7 +105,6 @@ def load_data(anio_seleccionado):
     df['Iniciales'] = df['Vendedor'].apply(lambda x: "".join([n[0] for n in str(x).split() if n]).upper())
     df['Size_Marker'] = df['Total_Acumulado'].clip(lower=1).fillna(1)
     
-    # CÁLCULO DE PROMEDIO REAL (Ignorando los meses que aún no han ocurrido)
     columnas_porcentajes = [f"{m}_%" for m in meses_n]
     df['Alcance_Promedio_Real'] = df[columnas_porcentajes].mean(axis=1, skipna=True).fillna(0)
     
@@ -178,19 +209,19 @@ try:
         if f_emp9 != "Todas": df_9 = df_9[df_9['Empresa'] == f_emp9]
         if f_loc9 != "Todas": df_9 = df_9[df_9['Localidad'] == f_loc9]
         
-        # APLICAMOS EL NUEVO CÁLCULO DEL EJE X
         df_9['X_Axis'] = df_9['Alcance_Promedio_Real'] if sel_p in ["Acumulado Anual", "Todos los meses (Promedio)"] else df_9[f"{sel_p}_%"].fillna(0)
 
+        # NUEVOS EMOJIS UNIVERSALES (100% COMPATIBLES)
         quadrants = {
-            "Dilema": ("rgba(255, 198, 26, 0.2)", "🟡", -5, 33.3, 66.6, 110),
-            "E. Emergente": ("rgba(144, 238, 144, 0.3)", "🌱", 33.3, 66.6, 66.6, 110),
-            "ESTRELLA": ("rgba(46, 204, 113, 0.3)", "🌟", 66.6, 130, 66.6, 110),
-            "Cuestionable": ("rgba(243, 156, 18, 0.2)", "🟧", -5, 33.3, 33.3, 66.6),
-            "Core Player": ("rgba(189, 195, 199, 0.2)", "⬜", 33.3, 66.6, 33.3, 66.6),
-            "High Performer": ("rgba(46, 204, 113, 0.15)", "❇️", 66.6, 130, 33.3, 66.6),
-            "Bajo Rendimiento": ("rgba(231, 76, 60, 0.2)", "🟥", -5, 33.3, -5, 33.3),
-            "En Riesgo": ("rgba(230, 126, 34, 0.2)", "🟠", 33.3, 66.6, -5, 33.3),
-            "Eficaz": ("rgba(39, 174, 96, 0.15)", "🟢", 66.6, 130, -5, 33.3)
+            "Dilema": ("rgba(255, 198, 26, 0.2)", "💡", -5, 33.3, 66.6, 110),
+            "E. Emergente": ("rgba(144, 238, 144, 0.3)", "📈", 33.3, 66.6, 66.6, 110),
+            "ESTRELLA": ("rgba(46, 204, 113, 0.3)", "⭐", 66.6, 130, 66.6, 110),
+            "Cuestionable": ("rgba(243, 156, 18, 0.2)", "⚠️", -5, 33.3, 33.3, 66.6),
+            "Core Player": ("rgba(189, 195, 199, 0.2)", "⚙️", 33.3, 66.6, 33.3, 66.6),
+            "High Performer": ("rgba(46, 204, 113, 0.15)", "🚀", 66.6, 130, 33.3, 66.6),
+            "Bajo Rendimiento": ("rgba(231, 76, 60, 0.2)", "📉", -5, 33.3, -5, 33.3),
+            "En Riesgo": ("rgba(230, 126, 34, 0.2)", "🚨", 33.3, 66.6, -5, 33.3),
+            "Eficaz": ("rgba(39, 174, 96, 0.15)", "✅", 66.6, 130, -5, 33.3)
         }
 
         st.write("**Visualizar Listado por Categoría Comercial:**")
@@ -294,15 +325,12 @@ try:
             with gr:
                 st.markdown("**Evolución mensual % alcance de ventas**")
                 
-                # --- SOLUCIÓN DE MESES COMPLETADOS ---
-                # Solo tomamos los meses que tienen un dato válido (no vacíos)
                 meses_completados = [m for m in lista_meses if pd.notnull(v_f[f"{m}_%"])]
                 alcances_reales = [v_f[f"{m}_%"] for m in meses_completados]
                 
                 if alcances_reales:
                     fig_l = px.line(x=meses_completados, y=alcances_reales, markers=True, text=[f"{val:.0f}%" for val in alcances_reales])
                     fig_l.update_traces(line_color='#2ecc71', line_width=4, marker=dict(size=10, color='white', line=dict(width=2, color='#2ecc71')))
-                    # Forzamos que el eje X muestre los 12 meses siempre como referencia
                     fig_l.update_layout(yaxis_range=[0, max(alcances_reales)+20], xaxis=dict(categoryorder='array', categoryarray=lista_meses))
                     st.plotly_chart(fig_l, use_container_width=True)
                 else:
