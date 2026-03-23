@@ -30,7 +30,7 @@ URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sh
 @st.cache_data
 def load_data():
     df = pd.read_csv(URL)
-    # Mapeo según estructura (B=1, D=3, E=4, F=5, G=6, H=7, AG=32, AH=33)
+    # Mapeo según estructura (B, D, E, F, G, H, AG, AH)
     mapping = {
         df.columns[1]: 'Vendedor', df.columns[3]: 'Fecha_Ingreso',
         df.columns[4]: 'Empresa', df.columns[5]: 'Localidad',
@@ -44,7 +44,7 @@ def load_data():
     for i, mes in enumerate(meses):
         df[mes] = pd.to_numeric(df.iloc[:, 8+i].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
     
-    # Limpieza numérica de totales y metas
+    # Limpieza numérica
     for c in ['Objetivo_Mensual', 'Total_Acumulado', 'Promedio']:
         df[c] = pd.to_numeric(df[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
     
@@ -54,7 +54,7 @@ def load_data():
 try:
     df_raw, lista_meses = load_data()
 
-    # --- 1. FILTROS SUPERIORES ---
+    # --- 1. FILTROS SUPERIORES (Diseño Horizontal) ---
     st.markdown("### 📊 Panel de Control Comercial 2025")
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.5, 2, 2, 1.5])
     
@@ -65,67 +65,76 @@ try:
     with f_col3:
         vendedor_sel = st.selectbox("BUSCAR VENDEDOR", sorted(df_raw['Vendedor'].unique()))
     with f_col4:
-        st.write(f"📈 **Dotación: {len(df_raw)}**")
+        dotacion_f = len(df_raw[df_raw['Empresa'] == f_empresa]) if f_empresa != "Todas" else len(df_raw)
+        st.write(f"📈 **Dotación: {dotacion_f}**")
         st.caption("Cierre Ciclo 2025")
 
-    # Aplicar filtros generales
+    # Aplicar filtros
     df = df_raw.copy()
     if f_empresa != "Todas": df = df[df['Empresa'] == f_empresa]
     if f_localidad != "Todas": df = df[df['Localidad'] == f_localidad]
 
-    # --- 2. FILA DE GRÁFICOS ACUMULADOS ---
+    # --- 2. FILA DE GRÁFICOS ACUMULADOS CON ETIQUETAS ---
     c_main_1, c_main_2 = st.columns([1.5, 1])
 
     with c_main_1:
         st.markdown("**Ventas por Empresa (Evolución Mensual)**")
         df_melt = df.groupby('Empresa')[lista_meses].sum().reset_index().melt(id_vars='Empresa', var_name='Mes', value_name='Ventas')
-        fig_emp = px.bar(df_melt, x='Mes', y='Ventas', color='Empresa', barmode='group', color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_emp.update_layout(height=300, margin=dict(t=10, b=10), showlegend=True)
+        fig_emp = px.bar(df_melt, x='Mes', y='Ventas', color='Empresa', barmode='group', 
+                         text_auto='.2s', color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_emp.update_layout(height=300, margin=dict(t=10, b=10))
         st.plotly_chart(fig_emp, use_container_width=True)
 
     with c_main_2:
-        st.markdown("**Top 10 Vendedores (Total AG)**")
+        st.markdown("**Top 10 Vendedores (Ventas Totales)**")
         top_10 = df.nlargest(10, 'Total_Acumulado')
-        fig_top = px.bar(top_10, x='Total_Acumulado', y='Vendedor', orientation='h', color_discrete_sequence=['#2ecc71'])
+        fig_top = px.bar(top_10, x='Total_Acumulado', y='Vendedor', orientation='h', 
+                         text='Total_Acumulado', color_discrete_sequence=['#2ecc71'])
+        fig_top.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
         fig_top.update_layout(height=300, margin=dict(t=10, b=10), yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_top, use_container_width=True)
 
-    # --- 3. ANÁLISIS INDIVIDUAL CON SEMÁFORO ---
+    # --- 3. ANÁLISIS INDIVIDUAL ---
     st.divider()
     v_data = df_raw[df_raw['Vendedor'] == vendedor_sel].iloc[0]
     
     with st.container():
-        # Cabecera y Datos del Vendedor
         d1, d2, d3 = st.columns([2.5, 1, 1])
         
         with d1:
             st.title(vendedor_sel)
-            # Cálculo de antigüedad exacto
             if pd.notnull(v_data['Fecha_Ingreso']):
-                hoy = datetime(2025, 12, 31) # Referencia cierre 2025
+                hoy = datetime(2025, 12, 31)
                 ant = hoy - v_data['Fecha_Ingreso']
                 st.markdown(f"🗓️ **Antigüedad:** {ant.days // 365} años y {(ant.days % 365) // 30} meses")
             st.write(f"🏢 **Empresa:** {v_data['Empresa']} | 📍 **Localidad:** {v_data['Localidad']} | 🛣️ **Canal:** {v_data['Canal']}")
 
-        # LÓGICA DEL SEMÁFORO
+        # Semáforo
         dif_objetivo = v_data['Promedio'] - v_data['Objetivo_Mensual']
-        color_semaforo = "normal" if dif_objetivo >= 0 else "inverse" # Verde si es positivo, Rojo si es negativo
+        color_semaforo = "normal" if dif_objetivo >= 0 else "inverse"
         
         with d2:
-            st.metric("META MENSUAL (H)", f"{v_data['Objetivo_Mensual']:,.0f}")
+            st.metric("META MENSUAL", f"{v_data['Objetivo_Mensual']:,.0f}")
         with d3:
-            # Aquí aplicamos el semáforo usando 'delta'
             st.metric(
-                label="PROMEDIO REAL (AH)", 
+                label="PROMEDIO REAL", 
                 value=f"{v_data['Promedio']:,.1f}", 
                 delta=f"{dif_objetivo:,.1f} vs Meta",
                 delta_color=color_semaforo
             )
 
-        # Gráfico de Evolución Mensual vs Target
+        # Gráfico Mensual con Etiquetas y Target
         ventas_v = v_data[lista_meses].values
         fig_evol = go.Figure()
-        fig_evol.add_trace(go.Bar(x=lista_meses, y=ventas_v, name="Ventas", marker_color='#3498db'))
+        fig_evol.add_trace(go.Bar(
+            x=lista_meses, 
+            y=ventas_v, 
+            name="Ventas", 
+            marker_color='#3498db',
+            text=ventas_v,
+            textposition='auto',
+            texttemplate='%{text:,.0f}'
+        ))
         fig_evol.add_trace(go.Scatter(x=lista_meses, y=[v_data['Objetivo_Mensual']]*12, mode='lines', 
                                       name="Target Mensual", line=dict(color='red', width=3, dash='dot')))
         fig_evol.update_layout(height=350, margin=dict(t=30), legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
@@ -141,7 +150,7 @@ try:
         st.plotly_chart(fig_pie, use_container_width=True)
         
     with g2:
-        st.markdown("**Consistencia de Ventas (Promedio AH)**")
+        st.markdown("**Consistencia de Ventas (Promedio Mensual)**")
         fig_box = px.box(df, x='Empresa', y='Promedio', points="all", color='Empresa')
         st.plotly_chart(fig_box, use_container_width=True)
 
