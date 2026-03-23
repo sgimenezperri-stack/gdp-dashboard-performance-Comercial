@@ -14,57 +14,17 @@ except ImportError:
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Performance Comercial Cenoa", layout="wide", page_icon="📈")
 
-# Estilos CSS - DISEÑO PROFESIONAL (SIDEBAR BLANCO Y TARJETAS)
+# Estilos CSS - DISEÑO PROFESIONAL INTACTO
 st.markdown("""
     <style>
-    /* Fondo principal */
     .main { background-color: #f4f7f6; }
-    
-    /* DISEÑO PROFESIONAL DEL MENÚ LATERAL (SIDEBAR) */
-    [data-testid="stSidebar"] {
-        background-color: #1e272e; /* Azul noche elegante */
-    }
-    /* Letras blancas para el título del menú */
-    [data-testid="stSidebar"] .stRadio > label {
-        font-size: 14px !important;
-        color: #ffffff !important; 
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 15px;
-    }
-    /* Contenedor de las opciones del menú */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label {
-        padding: 15px 20px;
-        background-color: #2f3640;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        transition: all 0.3s ease;
-        border-left: 5px solid transparent;
-        cursor: pointer;
-    }
-    /* FORZAR LETRAS BLANCAS en el texto de las opciones (módulos) */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label p, 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label div {
-        color: #ffffff !important; 
-        font-size: 16px !important;
-        font-weight: 600;
-    }
-    /* Efecto Hover (pasar el mouse) */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-        background-color: #353b48;
-        border-left: 5px solid #e67e22; /* Naranja Cenoa */
-    }
-    /* Módulo Activo / Seleccionado */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #e67e22 !important; 
-        border-left: 5px solid #d35400;
-    }
-    /* Ocultar el circulito nativo */
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
-        display: none; 
-    }
-
-    /* Estilos de Métricas y Botones Centrales */
+    [data-testid="stSidebar"] { background-color: #1e272e; }
+    [data-testid="stSidebar"] .stRadio > label { font-size: 14px !important; color: #ffffff !important; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label { padding: 15px 20px; background-color: #2f3640; border-radius: 8px; margin-bottom: 10px; transition: all 0.3s ease; border-left: 5px solid transparent; cursor: pointer; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p, [data-testid="stSidebar"] div[role="radiogroup"] > label div { color: #ffffff !important; font-size: 16px !important; font-weight: 600; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { background-color: #353b48; border-left: 5px solid #e67e22; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] { background-color: #e67e22 !important; border-left: 5px solid #d35400; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display: none; }
     [data-testid="stMetric"] { background-color: #ffffff; border-radius: 10px; padding: 15px; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
     .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; font-weight: bold; background-color: #ffffff; border: 1px solid #c8d6e5; transition: 0.3s; }
     .stButton>button:hover { border: 1px solid #2e86de; box-shadow: 0px 4px 10px rgba(0,0,0,0.08); }
@@ -73,13 +33,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARGA Y LIMPIEZA DE DATOS ---
-SHEET_ID = "1fXJ2UsTeOE8ipYXeP5oQYYCHRNtDJDRC" 
-SHEET_NAME = "PERFO%20COMERCIAL2025"
-URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
-
+# --- CARGA Y LIMPIEZA DE DATOS DINÁMICA POR AÑO ---
 @st.cache_data
-def load_data():
+def load_data(anio_seleccionado):
+    SHEET_ID = "1fXJ2UsTeOE8ipYXeP5oQYYCHRNtDJDRC" 
+    # Reemplazamos estáticamente el 2025 por la variable del año para leer la solapa correcta
+    SHEET_NAME = f"PERFO%20COMERCIAL{anio_seleccionado}" 
+    URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+
     df = pd.read_csv(URL)
     mapping = {
         df.columns[1]: 'Vendedor', df.columns[2]: 'Fecha_Ingreso',
@@ -115,15 +76,14 @@ def load_data():
     
     return df, meses_n, comp_labels
 
-def get_ant(fecha):
+# Calculamos la antigüedad basándonos en el año seleccionado
+def get_ant(fecha, anio_ref):
     if pd.isnull(fecha): return "Sin Dato"
-    diff = datetime(2025, 12, 31) - fecha
+    diff = datetime(int(anio_ref), 12, 31) - fecha
     a, m = diff.days // 365, (diff.days % 365) // 30
     return f"{a} años y {m} meses" if a > 0 else f"{m} meses"
 
 try:
-    df_raw, lista_meses, comp_labels = load_data()
-    
     st.sidebar.markdown("<br><h2 style='text-align: center; color: white;'>GRUPO CENOA</h2><br>", unsafe_allow_html=True)
     dimension = st.sidebar.radio("MÓDULOS", ["Performance Comercial", "Matriz 9-Box Comercial"])
 
@@ -133,8 +93,13 @@ try:
     if dimension == "Performance Comercial":
         st.markdown("## Performance Comercial Cenoa")
         
+        # Filtros (Añadido 2026 por defecto)
         f1, f2, f3, f4 = st.columns([1, 2, 2, 1.5])
-        with f1: st.selectbox("AÑO", ["2025"])
+        with f1: anio_sel = st.selectbox("AÑO", ["2026", "2025"])
+        
+        # Cargamos la data del año que seleccionó el usuario
+        df_raw, lista_meses, comp_labels = load_data(anio_sel)
+        
         with f2: 
             op_e = [x for x in sorted(df_raw['Empresa'].dropna().unique()) if str(x).upper() != "EMPRESA"]
             sel_emp = st.selectbox("EMPRESA", ["Todas"] + op_e)
@@ -171,7 +136,7 @@ try:
             d1, d2, d3 = st.columns([3, 1, 1])
             with d1:
                 st.subheader(v_sel)
-                st.markdown(f"<span style='color:#e67e22; font-weight:bold;'>{get_ant(v_data['Fecha_Ingreso'])}</span>", unsafe_allow_html=True)
+                st.markdown(f"<span style='color:#e67e22; font-weight:bold;'>{get_ant(v_data['Fecha_Ingreso'], anio_sel)}</span>", unsafe_allow_html=True)
                 st.caption(f"Canal: {v_data['Canal']} | Empresa: {v_data['Empresa']} | Localidad: {v_data['Localidad']}")
             d2.metric("META", int(v_data['Objetivo_Mensual']))
             diff = v_data['Promedio'] - v_data['Objetivo_Mensual']
@@ -200,10 +165,16 @@ try:
     elif dimension == "Matriz 9-Box Comercial":
         st.markdown("## Matriz 9-Box Comercial")
         
-        m_f1, m_f2, m_f3 = st.columns(3)
-        with m_f1: sel_p = st.selectbox("Periodo de Análisis:", ["Acumulado Anual", "Todos los meses (Promedio)"] + lista_meses)
-        with m_f2: f_emp9 = st.selectbox("Empresa ", ["Todas"] + sorted(df_raw['Empresa'].dropna().unique()))
-        with m_f3: f_loc9 = st.selectbox("Localidad ", ["Todas"] + sorted(df_raw['Localidad'].dropna().unique()))
+        # Agregamos el selector de año en la misma fila superior
+        m_f0, m_f1, m_f2, m_f3 = st.columns(4)
+        with m_f0: anio_sel9 = st.selectbox("AÑO", ["2026", "2025"])
+        
+        # Cargamos los datos del año seleccionado
+        df_raw, lista_meses, comp_labels = load_data(anio_sel9)
+        
+        with m_f1: sel_p = st.selectbox("Periodo:", ["Acumulado Anual", "Todos los meses (Promedio)"] + lista_meses)
+        with m_f2: f_emp9 = st.selectbox("Empresa", ["Todas"] + sorted(df_raw['Empresa'].dropna().unique()))
+        with m_f3: f_loc9 = st.selectbox("Localidad", ["Todas"] + sorted(df_raw['Localidad'].dropna().unique()))
 
         df_9 = df_raw.copy()
         if f_emp9 != "Todas": df_9 = df_9[df_9['Empresa'] == f_emp9]
@@ -294,12 +265,11 @@ try:
         if v_ficha != "-- Seleccionar Asesor --":
             v_f = df_9[df_9['Vendedor'] == v_ficha].iloc[0]
             
-            # --- NUEVA SECCIÓN DE DATOS DEL ASESOR ---
             st.markdown(f"""
             <div class='perfil-asesor'>
                 <h3 style='margin-bottom: 5px; color: #2c3e50;'>{v_f['Vendedor']}</h3>
                 <p style='font-size: 15px; margin-bottom: 0px;'>
-                    <b>Antigüedad:</b> <span style='color:#e67e22;'>{get_ant(v_f['Fecha_Ingreso'])}</span> &nbsp;|&nbsp; 
+                    <b>Antigüedad:</b> <span style='color:#e67e22;'>{get_ant(v_f['Fecha_Ingreso'], anio_sel9)}</span> &nbsp;|&nbsp; 
                     <b>Tipo/Canal:</b> {v_f['Canal']} &nbsp;|&nbsp; 
                     <b>Empresa:</b> {v_f['Empresa']} &nbsp;|&nbsp; 
                     <b>Localidad:</b> {v_f['Localidad']}
