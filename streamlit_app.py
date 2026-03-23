@@ -1,15 +1,24 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Cenoa Analytics 2025 - Precise", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Cenoa Analytics 2025", layout="wide", page_icon="🚗")
 
-# Estilo visual para KPIs
+# Estilos CSS para el Semáforo y la Estética
 st.markdown("""
     <style>
-    [data-testid="stMetricValue"] { font-size: 32px; font-weight: bold; color: #004a99; }
-    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+    .main { background-color: #f4f7f6; }
+    [data-testid="stMetric"] { 
+        background-color: #ffffff; 
+        border: 1px solid #e0e0e0; 
+        padding: 15px; 
+        border-radius: 12px; 
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.05);
+    }
+    .vendedor-header { background-color: #ffffff; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -19,108 +28,122 @@ SHEET_NAME = "PERFO%20COMERCIAL2025"
 URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 @st.cache_data
-def load_data_final():
+def load_data():
     df = pd.read_csv(URL)
-    
-    # MAPEADO QUIRÚRGICO POR POSICIÓN (Basado en tus indicaciones)
-    # Col B(1): Vendedor | Col D(3): Fecha | Col E(4): Empresa | Col F(5): Loc | Col G(6): Tipo
-    # Col H(7): Objetivo | Col AG(32): Total Anual | Col AH(33): Promedio
-    
+    # Mapeo según estructura (B=1, D=3, E=4, F=5, G=6, H=7, AG=32, AH=33)
     mapping = {
-        df.columns[1]: 'Vendedor',
-        df.columns[3]: 'Fecha Ingreso',
-        df.columns[4]: 'Empresa',
-        df.columns[5]: 'Localidad',
-        df.columns[6]: 'Tipo de Venta',
-        df.columns[7]: 'Objetivo Anual',
-        df.columns[32]: 'Total Ventas',
-        df.columns[33]: 'Promedio Mensual'
+        df.columns[1]: 'Vendedor', df.columns[3]: 'Fecha_Ingreso',
+        df.columns[4]: 'Empresa', df.columns[5]: 'Localidad',
+        df.columns[6]: 'Canal', df.columns[7]: 'Objetivo_Mensual',
+        df.columns[32]: 'Total_Acumulado', df.columns[33]: 'Promedio'
     }
-    
     df = df.rename(columns=mapping)
     
-    # Selección de solo las columnas necesarias para el análisis
-    cols_interes = ['Vendedor', 'Fecha Ingreso', 'Empresa', 'Localidad', 'Tipo de Venta', 'Objetivo Anual', 'Total Ventas', 'Promedio Mensual']
-    df = df[cols_interes].copy()
-
-    # Limpieza numérica (Convertir comas a puntos y manejar nulos)
-    for c in ['Objetivo Anual', 'Total Ventas', 'Promedio Mensual']:
+    # Meses (Índices 8 a 19 del Sheets)
+    meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    for i, mes in enumerate(meses):
+        df[mes] = pd.to_numeric(df.iloc[:, 8+i].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+    
+    # Limpieza numérica de totales y metas
+    for c in ['Objetivo_Mensual', 'Total_Acumulado', 'Promedio']:
         df[c] = pd.to_numeric(df[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
     
-    return df
+    df['Fecha_Ingreso'] = pd.to_datetime(df['Fecha_Ingreso'], errors='coerce')
+    return df, meses
 
 try:
-    df = load_data_final()
+    df_raw, lista_meses = load_data()
 
-    st.title("🚀 Business Intelligence: Grupo Cenoa 2025")
-    st.caption("Análisis acumulado de performance comercial (Enero - Diciembre)")
-
-    # --- PANEL DE FILTROS ---
-    st.sidebar.header("🔍 Filtros de Negocio")
+    # --- 1. FILTROS SUPERIORES ---
+    st.markdown("### 📊 Panel de Control Comercial 2025")
+    f_col1, f_col2, f_col3, f_col4 = st.columns([1.5, 2, 2, 1.5])
     
-    with st.sidebar:
-        f_empresa = st.multiselect("Filtrar por Empresa", options=sorted(df['Empresa'].dropna().unique()), default=df['Empresa'].dropna().unique())
-        f_localidad = st.multiselect("Filtrar por Localidad", options=sorted(df['Localidad'].dropna().unique()), default=df['Localidad'].dropna().unique())
-        f_tipo = st.multiselect("Filtrar por Tipo de Venta", options=sorted(df['Tipo de Venta'].dropna().unique()), default=df['Tipo de Venta'].dropna().unique())
-        f_vendedor = st.sidebar.text_input("🔍 Buscar Vendedor por nombre")
+    with f_col1:
+        f_empresa = st.selectbox("EMPRESA", ["Todas"] + sorted(df_raw['Empresa'].dropna().unique().tolist()))
+    with f_col2:
+        f_localidad = st.selectbox("LOCALIDAD", ["Todas"] + sorted(df_raw['Localidad'].dropna().unique().tolist()))
+    with f_col3:
+        vendedor_sel = st.selectbox("BUSCAR VENDEDOR", sorted(df_raw['Vendedor'].unique()))
+    with f_col4:
+        st.write(f"📈 **Dotación: {len(df_raw)}**")
+        st.caption("Cierre Ciclo 2025")
 
-    # Lógica de filtrado
-    mask = df['Empresa'].isin(f_empresa) & df['Localidad'].isin(f_localidad) & df['Tipo de Venta'].isin(f_tipo)
-    if f_vendedor:
-        mask = mask & df['Vendedor'].str.contains(f_vendedor, case=False, na=False)
-    
-    df_filtered = df[mask].copy()
+    # Aplicar filtros generales
+    df = df_raw.copy()
+    if f_empresa != "Todas": df = df[df['Empresa'] == f_empresa]
+    if f_localidad != "Todas": df = df[df['Localidad'] == f_localidad]
 
-    # --- KPIs PRINCIPALES ---
-    c1, c2, c3, c4 = st.columns(4)
-    
-    total_acumulado = df_filtered['Total Ventas'].sum()
-    meta_acumulada = df_filtered['Objetivo Anual'].sum()
-    alcance_real = (total_acumulado / meta_acumulada * 100) if meta_acumulada > 0 else 0
-    promedio_vendedores = df_filtered['Promedio Mensual'].mean()
+    # --- 2. FILA DE GRÁFICOS ACUMULADOS ---
+    c_main_1, c_main_2 = st.columns([1.5, 1])
 
-    c1.metric("Ventas Acumuladas", f"{total_acumulado:,.0f}")
-    c2.metric("Meta Total", f"{meta_acumulada:,.0f}")
-    c3.metric("% Alcance Anual", f"{alcance_real:.1f}%")
-    c4.metric("Promedio de Venta", f"{promedio_vendedores:,.1f}")
+    with c_main_1:
+        st.markdown("**Ventas por Empresa (Evolución Mensual)**")
+        df_melt = df.groupby('Empresa')[lista_meses].sum().reset_index().melt(id_vars='Empresa', var_name='Mes', value_name='Ventas')
+        fig_emp = px.bar(df_melt, x='Mes', y='Ventas', color='Empresa', barmode='group', color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_emp.update_layout(height=300, margin=dict(t=10, b=10), showlegend=True)
+        st.plotly_chart(fig_emp, use_container_width=True)
 
+    with c_main_2:
+        st.markdown("**Top 10 Vendedores (Total AG)**")
+        top_10 = df.nlargest(10, 'Total_Acumulado')
+        fig_top = px.bar(top_10, x='Total_Acumulado', y='Vendedor', orientation='h', color_discrete_sequence=['#2ecc71'])
+        fig_top.update_layout(height=300, margin=dict(t=10, b=10), yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_top, use_container_width=True)
+
+    # --- 3. ANÁLISIS INDIVIDUAL CON SEMÁFORO ---
     st.divider()
-
-    # --- RANKING DE VENTAS (Col AG) ---
-    st.subheader("🏆 Ranking de Ventas Totales por Asesor")
+    v_data = df_raw[df_raw['Vendedor'] == vendedor_sel].iloc[0]
     
-    ranking_data = df_filtered.sort_values('Total Ventas', ascending=True).tail(15) # Top 15 para no saturar
+    with st.container():
+        # Cabecera y Datos del Vendedor
+        d1, d2, d3 = st.columns([2.5, 1, 1])
+        
+        with d1:
+            st.title(vendedor_sel)
+            # Cálculo de antigüedad exacto
+            if pd.notnull(v_data['Fecha_Ingreso']):
+                hoy = datetime(2025, 12, 31) # Referencia cierre 2025
+                ant = hoy - v_data['Fecha_Ingreso']
+                st.markdown(f"🗓️ **Antigüedad:** {ant.days // 365} años y {(ant.days % 365) // 30} meses")
+            st.write(f"🏢 **Empresa:** {v_data['Empresa']} | 📍 **Localidad:** {v_data['Localidad']} | 🛣️ **Canal:** {v_data['Canal']}")
+
+        # LÓGICA DEL SEMÁFORO
+        dif_objetivo = v_data['Promedio'] - v_data['Objetivo_Mensual']
+        color_semaforo = "normal" if dif_objetivo >= 0 else "inverse" # Verde si es positivo, Rojo si es negativo
+        
+        with d2:
+            st.metric("META MENSUAL (H)", f"{v_data['Objetivo_Mensual']:,.0f}")
+        with d3:
+            # Aquí aplicamos el semáforo usando 'delta'
+            st.metric(
+                label="PROMEDIO REAL (AH)", 
+                value=f"{v_data['Promedio']:,.1f}", 
+                delta=f"{dif_objetivo:,.1f} vs Meta",
+                delta_color=color_semaforo
+            )
+
+        # Gráfico de Evolución Mensual vs Target
+        ventas_v = v_data[lista_meses].values
+        fig_evol = go.Figure()
+        fig_evol.add_trace(go.Bar(x=lista_meses, y=ventas_v, name="Ventas", marker_color='#3498db'))
+        fig_evol.add_trace(go.Scatter(x=lista_meses, y=[v_data['Objetivo_Mensual']]*12, mode='lines', 
+                                      name="Target Mensual", line=dict(color='red', width=3, dash='dot')))
+        fig_evol.update_layout(height=350, margin=dict(t=30), legend=dict(orientation="h", y=1.1, x=1, xanchor='right'))
+        st.plotly_chart(fig_evol, use_container_width=True)
+
+    # --- 4. GRÁFICOS COMPLEMENTARIOS ---
+    st.divider()
+    g1, g2 = st.columns(2)
     
-    fig_rank = px.bar(
-        ranking_data,
-        x='Total Ventas',
-        y='Vendedor',
-        orientation='h',
-        text='Total Ventas',
-        color='Total Ventas',
-        color_continuous_scale='Greens',
-        labels={'Total Ventas': 'Ventas Acumuladas (Col AG)', 'Vendedor': 'Asesor'}
-    )
-    fig_rank.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
-    st.plotly_chart(fig_rank, use_container_width=True)
-
-    # --- COMPARATIVA: OBJETIVO VS REAL ---
-    col_a, col_b = st.columns(2)
-    
-    with col_a:
-        st.subheader("📍 Desempeño por Localidad")
-        fig_loc = px.sunburst(df_filtered, path=['Localidad', 'Empresa'], values='Total Ventas', color='Total Ventas', color_continuous_scale='RdBu')
-        st.plotly_chart(fig_loc, use_container_width=True)
-
-    with col_b:
-        st.subheader("🎯 Consistencia (Promedio Mensual)")
-        # Gráfico para ver quién mantiene el mejor promedio (Col AH)
-        fig_avg = px.box(df_filtered, x='Empresa', y='Promedio Mensual', points="all", color="Empresa")
-        st.plotly_chart(fig_avg, use_container_width=True)
-
-    # --- TABLA DETALLADA ---
-    with st.expander("📄 Ver detalle técnico de columnas (B, D, E, F, G, H, AG, AH)"):
-        st.dataframe(df_filtered.sort_values('Total Ventas', ascending=False))
+    with g1:
+        st.markdown("**Participación por Localidad**")
+        fig_pie = px.pie(df, values='Total_Acumulado', names='Localidad', hole=0.5, color_discrete_sequence=px.colors.qualitative.Safe)
+        st.plotly_chart(fig_pie, use_container_width=True)
+        
+    with g2:
+        st.markdown("**Consistencia de Ventas (Promedio AH)**")
+        fig_box = px.box(df, x='Empresa', y='Promedio', points="all", color='Empresa')
+        st.plotly_chart(fig_box, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Error de estructura: {e}")
+    st.error(f"Error cargando el dashboard: {e}")
