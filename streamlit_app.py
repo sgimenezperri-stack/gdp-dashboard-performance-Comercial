@@ -4,15 +4,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Performance Comercial Grupo Cenoa", layout="wide", page_icon="🚗")
 
-# Estilo para imitar la interfaz del ejemplo
+# Estilos CSS para el diseño Premium
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    div[data-testid="stMetric"] { background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; }
-    .vendedor-card { border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 5px; background-color: white; }
+    [data-testid="stMetric"] { 
+        background-color: #ffffff; 
+        border-radius: 10px; 
+        padding: 15px; 
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.05);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -24,116 +28,125 @@ URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sh
 @st.cache_data
 def load_data():
     df = pd.read_csv(URL)
-    # Mapeo preciso de columnas
-    mapping = {
-        df.columns[1]: 'Vendedor', df.columns[3]: 'Fecha_Ingreso',
-        df.columns[4]: 'Empresa', df.columns[5]: 'Localidad',
-        df.columns[6]: 'Canal', df.columns[7]: 'Objetivo_Mensual',
-        df.columns[32]: 'Total_Acumulado', df.columns[33]: 'Promedio'
-    }
-    df = df.rename(columns=mapping)
     
-    # Extraer meses (Col 8 a 19 -> I a T)
-    meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    for i, mes in enumerate(meses_nombres):
-        df[mes] = pd.to_numeric(df.iloc[:, 8+i].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+    # 1. Mapeo Quirúrgico por Índice (B=1, D=3, E=4, F=5, G=6, H=7, AG=32, AH=33)
+    mapping = {
+        df.columns[1]: 'Vendedor', 
+        df.columns[3]: 'Fecha_Ingreso',
+        df.columns[4]: 'Empresa', 
+        df.columns[5]: 'Localidad',
+        df.columns[6]: 'Canal', 
+        df.columns[7]: 'Objetivo_Mensual',
+        df.columns[32]: 'Total_Acumulado', 
+        df.columns[33]: 'Promedio'
+    }
+    
+    # 2. Extracción de Meses (Columnas Saltadas: I, K, M, O, Q, S, U, W, Y, AA, AC, AE)
+    # Índices correspondientes: 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30
+    indices_meses = [8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+    nombres_meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    
+    for i, idx in enumerate(indices_meses):
+        col_name = df.columns[idx]
+        df[nombres_meses[i]] = pd.to_numeric(df[col_name].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+    
+    df = df.rename(columns=mapping)
     
     # Limpieza de valores clave
     for c in ['Objetivo_Mensual', 'Total_Acumulado', 'Promedio']:
         df[c] = pd.to_numeric(df[c].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
     
     df['Fecha_Ingreso'] = pd.to_datetime(df['Fecha_Ingreso'], errors='coerce')
-    return df, meses_nombres
+    return df, nombres_meses
 
 try:
     df_raw, lista_meses = load_data()
 
-    # --- HEADER / FILTROS SUPERIORES ---
-    h1, h2, h3, h4, h5 = st.columns([3, 1, 1.5, 1.5, 1])
-    with h1: st.title("Performance Comercial Grupo Cenoa")
-    with h2: st.selectbox("AÑO", ["2025"])
-    with h3: f_empresa = st.selectbox("EMPRESA", ["Todas"] + sorted(df_raw['Empresa'].dropna().unique().tolist()))
-    with h4: f_localidad = st.selectbox("LOCALIDAD", ["Todas"] + sorted(df_raw['Localidad'].dropna().unique().tolist()))
-    with h5: st.metric("", f"👥 {len(df_raw)}")
+    # --- 1. FILTROS SUPERIORES (Arriba del panel) ---
+    st.markdown("### 📊 Performance Comercial Grupo Cenoa")
+    f1, f2, f3, f4 = st.columns([1, 2, 2, 1])
+    
+    with f1:
+        st.selectbox("AÑO", ["2025"])
+    with f2:
+        f_empresa = st.selectbox("EMPRESA", ["Todas"] + sorted(df_raw['Empresa'].dropna().unique().tolist()))
+    with f3:
+        f_localidad = st.selectbox("LOCALIDAD", ["Todas"] + sorted(df_raw['Localidad'].dropna().unique().tolist()))
+    with f4:
+        st.metric("VENDEDORES", len(df_raw))
 
-    # Filtrado
+    # Filtrado dinámico
     df = df_raw.copy()
     if f_empresa != "Todas": df = df[df['Empresa'] == f_empresa]
     if f_localidad != "Todas": df = df[df['Localidad'] == f_localidad]
 
-    # --- FILA 1: GRÁFICOS GENERALES ---
-    c1, c2 = st.columns([1.5, 1])
+    # --- 2. GRÁFICOS GENERALES (Acumulado y Top 10) ---
+    c_top1, c_top2 = st.columns([1.5, 1])
 
-    with c1:
-        st.markdown("**Cantidad de Operaciones por Empresa**")
+    with c_top1:
+        st.markdown("**Cantidad de Operaciones por Empresa (Acumulado)**")
         df_melt = df.groupby('Empresa')[lista_meses].sum().reset_index().melt(id_vars='Empresa', var_name='Mes', value_name='Ventas')
-        fig_gen = px.bar(df_melt, x='Mes', y='Ventas', color_discrete_sequence=['#3498db'], text_auto='.0f')
-        # Forzar orden de meses
-        fig_gen.update_xaxes(categoryorder='array', categoryarray=lista_meses)
-        fig_gen.update_layout(height=300, margin=dict(t=10, b=10), showlegend=False)
-        st.plotly_chart(fig_gen, use_container_width=True)
+        fig_emp = px.bar(df_melt, x='Mes', y='Ventas', color='Empresa', barmode='group', 
+                         text_auto='.0f', color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_emp.update_xaxes(categoryorder='array', categoryarray=lista_meses)
+        fig_emp.update_layout(height=300, margin=dict(t=10, b=10), showlegend=True)
+        st.plotly_chart(fig_emp, use_container_width=True)
 
-    with c2:
+    with c_top2:
         st.markdown("**Top 10 Vendedores (Operaciones)**")
         top_10 = df.nlargest(10, 'Total_Acumulado')
-        fig_top = px.bar(top_10, x='Total_Acumulado', y='Vendedor', orientation='h', text_auto='.0f', color_discrete_sequence=['#e67e22'])
+        fig_top = px.bar(top_10, x='Total_Acumulado', y='Vendedor', orientation='h', 
+                         text='Total_Acumulado', color_discrete_sequence=['#e67e22'])
+        fig_top.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
         fig_top.update_layout(height=300, margin=dict(t=10, b=10), yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_top, use_container_width=True)
 
-    # --- FILA 2: DETALLE INDIVIDUAL (LISTA + GRÁFICO) ---
+    # --- 3. ANÁLISIS INDIVIDUAL (Con lista a la izquierda) ---
     st.divider()
-    col_lista, col_detalle = st.columns([1, 2.5])
+    col_list, col_chart = st.columns([1, 2.5])
 
-    with col_lista:
-        st.markdown("**Seleccionar Vendedor**")
-        # Buscador de texto
-        search = st.text_input("Buscar...", label_visibility="collapsed")
-        df_list = df[df['Vendedor'].str.contains(search, case=False)] if search else df
-        
-        # Lista de selección (usamos un radio con estilo de lista)
-        vendedor_sel = st.radio("Lista de Vendedores", options=df_list['Vendedor'].tolist(), label_visibility="collapsed")
+    with col_list:
+        vendedor_sel = st.selectbox("Seleccionar Vendedor:", sorted(df['Vendedor'].unique()))
+        v_data = df[df['Vendedor'] == vendedor_sel].iloc[0]
+        st.info(f"Ventas Totales: {v_data['Total_Acumulado']:,.0f} op.")
 
-    with col_detalle:
-        v_data = df_raw[df_raw['Vendedor'] == vendedor_sel].iloc[0]
-        
-        # Header del Vendedor Seleccionado
-        d_cab, d_met = st.columns([3, 1])
+    with col_chart:
+        # Cabecera individual
+        d_cab, d_obj, d_prom = st.columns([2.5, 1, 1])
         with d_cab:
             st.subheader(vendedor_sel)
-            st.caption(f"{v_data['Canal']} | {v_data['Empresa']}")
-            # Antigüedad
-            hoy = datetime(2025, 12, 31)
-            ant = hoy - v_data['Fecha_Ingreso']
-            st.markdown(f"<span style='color:orange; font-weight:bold;'>{ant.days // 365} Años {(ant.days % 365) // 30} Meses</span>", unsafe_allow_html=True)
-        
-        with d_met:
-            m_obj, m_prom = st.columns(2)
-            m_obj.metric("OBJ", int(v_data['Objetivo_Mensual']))
-            # Semáforo en Promedio
-            diff = v_data['Promedio'] - v_data['Objetivo_Mensual']
-            m_prom.metric("PROM", f"{v_data['Promedio']:.1f}", delta=f"{diff:.1f}", delta_color="normal" if diff >= 0 else "inverse")
+            if pd.notnull(v_data['Fecha_Ingreso']):
+                ant = datetime(2025, 12, 31) - v_data['Fecha_Ingreso']
+                st.markdown(f"<span style='color:#e67e22; font-weight:bold;'>{ant.days // 365} Años {(ant.days % 365) // 30} Meses de Antigüedad</span>", unsafe_allow_html=True)
+            st.write(f"Canal: {v_data['Canal']} | Empresa: {v_data['Empresa']} | Localidad: {v_data['Localidad']}")
 
-        # GRÁFICO DE EVOLUCIÓN (MESES SIEMPRE VISIBLES)
-        ventas_vals = [v_data[m] for m in lista_meses]
+        # Semáforo de desempeño
+        diff = v_data['Promedio'] - v_data['Objetivo_Mensual']
+        with d_obj:
+            st.metric("OBJETIVO", f"{v_data['Objetivo_Mensual']:,.0f}")
+        with d_prom:
+            st.metric("PROMEDIO", f"{v_data['Promedio']:,.1f}", delta=f"{diff:.1f}", delta_color="normal" if diff >= 0 else "inverse")
+
+        # Evolución Mensual (Meses fijos)
+        vals_vendedor = [v_data[m] for m in lista_meses]
         fig_ind = go.Figure()
-        # Barras de Ventas
-        fig_ind.add_trace(go.Bar(
-            x=lista_meses, y=ventas_vals, name="Ventas", 
-            marker_color='#3498db', text=ventas_vals, textposition='auto'
-        ))
-        # Línea de Objetivo (Target)
-        fig_ind.add_trace(go.Scatter(
-            x=lista_meses, y=[v_data['Objetivo_Mensual']]*12, 
-            mode='lines', name="Objetivo", line=dict(color='red', width=2, dash='dot')
-        ))
+        fig_ind.add_trace(go.Bar(x=lista_meses, y=vals_vendedor, name="Ventas", marker_color='#3498db',
+                                 text=vals_vendedor, textposition='auto', texttemplate='%{text:,.0f}'))
+        fig_ind.add_trace(go.Scatter(x=lista_meses, y=[v_data['Objetivo_Mensual']]*12, mode='lines', 
+                                      name="Objetivo", line=dict(color='red', width=3, dash='dot')))
         
-        fig_ind.update_layout(
-            height=300, margin=dict(t=20, b=20),
-            xaxis=dict(type='category', categoryorder='array', categoryarray=lista_meses), # FORZAR LOS 12 MESES
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
+        fig_ind.update_layout(height=350, margin=dict(t=20), xaxis=dict(type='category', categoryorder='array', categoryarray=lista_meses))
         st.plotly_chart(fig_ind, use_container_width=True)
-        st.write(f"📍 Localidad: {v_data['Localidad']} | Canal: {v_data['Canal']}")
+
+    # --- 4. GRÁFICOS COMPLEMENTARIOS ---
+    st.divider()
+    pie_col, box_col = st.columns(2)
+    with pie_col:
+        st.markdown("**Desempeño por Localidad**")
+        st.plotly_chart(px.pie(df, values='Total_Acumulado', names='Localidad', hole=0.4), use_container_width=True)
+    with box_col:
+        st.markdown("**Consistencia (Promedio Mensual)**")
+        st.plotly_chart(px.box(df, x='Empresa', y='Promedio', color='Empresa'), use_container_width=True)
 
 except Exception as e:
-    st.error(f"Error en la visualización: {e}")
+    st.error(f"Error en la estructura del Dashboard: {e}")
