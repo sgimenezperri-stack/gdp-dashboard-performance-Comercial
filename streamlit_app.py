@@ -12,9 +12,9 @@ except ImportError:
     CLICK_HABILITADO = False
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Cenoa BI - Performance y Talento", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Performance Comercial Cenoa", layout="wide", page_icon="📈")
 
-# Estilos CSS - DISEÑO PROFESIONAL (SIDEBAR Y TARJETAS)
+# Estilos CSS - DISEÑO PROFESIONAL (SIDEBAR LETRAS BLANCAS Y TARJETAS)
 st.markdown("""
     <style>
     /* Fondo principal */
@@ -23,15 +23,16 @@ st.markdown("""
     /* DISEÑO PROFESIONAL DEL MENÚ LATERAL (SIDEBAR) */
     [data-testid="stSidebar"] {
         background-color: #1e272e; /* Azul noche elegante */
-        color: #ffffff;
     }
+    /* Letras blancas para el título del menú */
     [data-testid="stSidebar"] .stRadio > label {
-        font-size: 13px !important;
-        color: #7f8fa6;
+        font-size: 14px !important;
+        color: #ffffff !important; 
         text-transform: uppercase;
         letter-spacing: 1px;
         margin-bottom: 15px;
     }
+    /* Letras blancas para las opciones del menú */
     [data-testid="stSidebar"] div[role="radiogroup"] > label {
         padding: 15px 20px;
         background-color: #2f3640;
@@ -39,15 +40,15 @@ st.markdown("""
         margin-bottom: 10px;
         font-size: 16px !important;
         font-weight: 600;
-        color: #dcdde1;
+        color: #ffffff !important; 
         transition: all 0.3s ease;
         border-left: 5px solid transparent;
         cursor: pointer;
     }
     [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
         background-color: #353b48;
-        border-left: 5px solid #e67e22; /* Naranja Cenoa al pasar el mouse */
-        color: #ffffff;
+        border-left: 5px solid #e67e22; /* Naranja Cenoa */
+        color: #ffffff !important;
     }
     [data-testid="stSidebar"] div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #e67e22 !important; /* Activo en Naranja Cenoa */
@@ -55,7 +56,7 @@ st.markdown("""
         border-left: 5px solid #d35400;
     }
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child {
-        display: none; /* Oculta el circulito nativo del radio button para aspecto de menú web */
+        display: none; /* Oculta el circulito nativo */
     }
 
     /* Estilos de Métricas y Botones Centrales */
@@ -63,6 +64,7 @@ st.markdown("""
     .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; font-weight: bold; background-color: #ffffff; border: 1px solid #c8d6e5; transition: 0.3s; }
     .stButton>button:hover { border: 1px solid #2e86de; box-shadow: 0px 4px 10px rgba(0,0,0,0.08); }
     .metric-card { background-color: #ffffff; border-radius: 10px; padding: 20px; text-align: center; border: 1px solid #e0e0e0; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); }
+    .perfil-asesor { background-color: #ffffff; padding: 15px 20px; border-radius: 10px; border-left: 5px solid #e67e22; margin-bottom: 20px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05);}
     </style>
     """, unsafe_allow_html=True)
 
@@ -118,13 +120,13 @@ try:
     df_raw, lista_meses, comp_labels = load_data()
     
     st.sidebar.markdown("<br><h2 style='text-align: center; color: white;'>GRUPO CENOA</h2><br>", unsafe_allow_html=True)
-    dimension = st.sidebar.radio("SELECCIONE EL MÓDULO:", ["Performance Comercial", "Matriz 9-Box Comercial"])
+    dimension = st.sidebar.radio("MÓDULOS", ["Performance Comercial", "Matriz 9-Box Comercial"])
 
     # =========================================================
     # DIMENSIÓN 1: PERFORMANCE COMERCIAL
     # =========================================================
     if dimension == "Performance Comercial":
-        st.markdown("### 📊 Performance Comercial Grupo Cenoa")
+        st.markdown("## Performance Comercial Cenoa")
         
         f1, f2, f3, f4 = st.columns([1, 2, 2, 1.5])
         with f1: st.selectbox("AÑO", ["2025"])
@@ -165,7 +167,7 @@ try:
             with d1:
                 st.subheader(v_sel)
                 st.markdown(f"<span style='color:#e67e22; font-weight:bold;'>{get_ant(v_data['Fecha_Ingreso'])}</span>", unsafe_allow_html=True)
-                st.caption(f"{v_data['Canal']} | {v_data['Empresa']} | {v_data['Localidad']}")
+                st.caption(f"Canal: {v_data['Canal']} | Empresa: {v_data['Empresa']} | Localidad: {v_data['Localidad']}")
             d2.metric("META", int(v_data['Objetivo_Mensual']))
             diff = v_data['Promedio'] - v_data['Objetivo_Mensual']
             d3.metric("PROM", f"{v_data['Promedio']:.1f}", delta=f"{diff:.1f}", delta_color="normal" if diff >= 0 else "inverse")
@@ -191,7 +193,7 @@ try:
     # DIMENSIÓN 2: MATRIZ 9-BOX
     # =========================================================
     elif dimension == "Matriz 9-Box Comercial":
-        st.markdown("### 🎯 Matriz de Talento 9-Box")
+        st.markdown("## Matriz 9-Box Comercial")
         
         m_f1, m_f2, m_f3 = st.columns(3)
         with m_f1: sel_p = st.selectbox("Periodo de Análisis:", ["Acumulado Anual", "Todos los meses (Promedio)"] + lista_meses)
@@ -204,8 +206,6 @@ try:
         
         df_9['X_Axis'] = df_9['Alcance_Total_Anual'] if sel_p in ["Acumulado Anual", "Todos los meses (Promedio)"] else df_9[f"{sel_p}_%"]
 
-        # --- DICCIONARIO DE COLORES Y POSICIONES ---
-        # Formato: Nombre: (Color Fondo, emoji, x_min, x_max, y_min, y_max)
         quadrants = {
             "Dilema": ("rgba(255, 198, 26, 0.2)", "🟡", -5, 33.3, 66.6, 110),
             "E. Emergente": ("rgba(144, 238, 144, 0.3)", "🌱", 33.3, 66.6, 66.6, 110),
@@ -218,7 +218,6 @@ try:
             "Eficaz": ("rgba(39, 174, 96, 0.15)", "🟢", 66.6, 130, -5, 33.3)
         }
 
-        # 1. BOTONES DE CATEGORÍA CON INDICADORES VISUALES
         st.write("**Visualizar Listado por Categoría Comercial:**")
         cats = list(quadrants.keys())
         bc1, bc2, bc3 = st.columns(3)
@@ -237,7 +236,6 @@ try:
             emoji_sel = quadrants[st.session_state.cat_filtrada][1]
             st.markdown(f"#### 📋 Asesores en Categoría: {emoji_sel} {st.session_state.cat_filtrada}")
             
-            # Lógica de filtro basada en el diccionario (limites exactos)
             q_info = quadrants[st.session_state.cat_filtrada]
             df_detalle = df_9[(df_9['X_Axis'] >= q_info[2]) & (df_9['X_Axis'] <= q_info[3]) & 
                               (df_9['Comp_Total_%'] >= q_info[4]) & (df_9['Comp_Total_%'] <= q_info[5])]
@@ -251,7 +249,6 @@ try:
                     st.rerun() 
             st.divider()
 
-        # 2. GRÁFICO MATRIZ (PINTADO COMPLETAMENTE)
         fig_9 = px.scatter(
             df_9, x='X_Axis', y='Comp_Total_%', text='Iniciales', color='Empresa',
             size='Size_Marker', hover_name='Vendedor',
@@ -261,11 +258,9 @@ try:
         )
         fig_9.update_traces(textposition='middle center', textfont=dict(color='white', size=11), marker=dict(opacity=0.9, line=dict(width=1.5, color='DarkSlateGrey')))
         
-        # Inyectar color a TODOS LOS 9 CUADRANTES
         for cat, info in quadrants.items():
             fig_9.add_shape(type="rect", x0=info[2], x1=info[3], y0=info[4], y1=info[5], fillcolor=info[0], layer="below", line_width=0)
         
-        # Líneas Divisorias
         fig_9.add_vline(x=33.3, line_dash="dash", line_color="rgba(0,0,0,0.3)")
         fig_9.add_vline(x=66.6, line_dash="dash", line_color="rgba(0,0,0,0.3)")
         fig_9.add_hline(y=33.3, line_dash="dash", line_color="rgba(0,0,0,0.3)")
@@ -279,7 +274,7 @@ try:
             if len(puntos_click) > 0:
                 click_x = puntos_click[0]['x']
                 click_y = puntos_click[0]['y']
-                match = df_9[(df_9['X_Axis'] == click_x) & (df_9['Comp_Total_%'] == click_y)]
+                match = df_9[(df_9['X_Axis'].round(1) == round(click_x, 1)) & (df_9['Comp_Total_%'].round(1) == round(click_y, 1))]
                 if not match.empty: vendedor_seleccionado = match.iloc[0]['Vendedor']
         else:
             st.plotly_chart(fig_9, use_container_width=True)
@@ -293,6 +288,19 @@ try:
 
         if v_ficha != "-- Seleccionar Asesor --":
             v_f = df_9[df_9['Vendedor'] == v_ficha].iloc[0]
+            
+            # --- NUEVA SECCIÓN DE DATOS DEL ASESOR ---
+            st.markdown(f"""
+            <div class='perfil-asesor'>
+                <h3 style='margin-bottom: 5px; color: #2c3e50;'>{v_f['Vendedor']}</h3>
+                <p style='font-size: 15px; margin-bottom: 0px;'>
+                    <b>Antigüedad:</b> <span style='color:#e67e22;'>{get_ant(v_f['Fecha_Ingreso'])}</span> &nbsp;|&nbsp; 
+                    <b>Tipo/Canal:</b> {v_f['Canal']} &nbsp;|&nbsp; 
+                    <b>Empresa:</b> {v_f['Empresa']} &nbsp;|&nbsp; 
+                    <b>Localidad:</b> {v_f['Localidad']}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
             
             k1, k2, k3 = st.columns(3)
             with k1: st.markdown(f"<div class='metric-card'><h2>{v_f['X_Axis']:.1f}%</h2><p>RESULTADOS ({sel_p})</p></div>", unsafe_allow_html=True)
