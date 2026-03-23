@@ -3,123 +3,125 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# 1. CONFIGURACIÓN E IDENTIFICADORES
-SHEET_ID = "1bjkGqCy_ftvAxfqkbxprVrvDMGIaQV91"
-# Nombres de columnas detectados en tus reportes de Cenoa
-COL_NOMBRE = "Nombre y apellido"
-COL_COMPETENCIAS = "Puntaje competencias"
-COL_OBJETIVOS = "Puntaje objetivos 2"
-COL_JEFE = "Jefe directo"
-COL_PUNTAJE_FINAL = "Nuevo puntaje (1-5)"
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Cenoa Performance Analytics", layout="wide", page_icon="🚗")
 
-st.set_page_config(page_title="Cenoa Analytics Pro", layout="wide", initial_sidebar_state="expanded")
-
-# Estilo personalizado
+# --- ESTILO VISUAL ---
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .main { background-color: #f8f9fa; }
+    .stMetric { border: 1px solid #e0e0e0; padding: 10px; border-radius: 8px; background-color: white; }
     </style>
     """, unsafe_allow_html=True)
 
+# --- CARGA DE DATOS (Link Publicado) ---
+# Convertimos tu link de HTML a formato de descarga CSV
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUIM7cEzymYekqDN9I4Jyd0o9peeJh5izcTtFFHPDzxBmt1zWJxa3gyD8hDMBLDw/pub?output=csv"
+
 @st.cache_data
-def load_and_clean_data(sheet_id):
-    # Intentamos cargar la primera solapa útil (usualmente la de resultados)
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
-    df = pd.read_csv(url)
-    df.columns = df.columns.str.strip()
-    
-    # Limpieza de datos numéricos (manejo de comas decimales y nulos)
-    for col in [COL_COMPETENCIAS, COL_OBJETIVOS, COL_PUNTAJE_FINAL]:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(',', '.').pipe(pd.to_numeric, errors='coerce').fillna(0)
-    
-    return df
+def get_data():
+    try:
+        df = pd.read_csv(CSV_URL)
+        df.columns = df.columns.str.strip().str.lower()
+        # Limpieza de valores numéricos
+        cols_to_fix = ['ventas', 'objetivo', 'competencias', 'potencial']
+        for col in cols_to_fix:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        return df
+    except Exception as e:
+        st.error(f"Error cargando datos: {e}")
+        return pd.DataFrame()
 
-# --- CARGA DE DATOS ---
-try:
-    df = load_and_clean_data(SHEET_ID)
-    
-    st.title("🚀 Business Intelligence: Performance Comercial")
-    st.subheader("Grupo Cenoa - Análisis Integral de Talento y Resultados")
+df = get_data()
 
-    # --- SIDEBAR / FILTROS ---
-    st.sidebar.image("https://via.placeholder.com/150x50?text=GRUPO+CENOA", use_container_width=True) # Reemplazar con URL de logo real
-    st.sidebar.header("Panel de Control")
-    
-    filter_jefe = st.sidebar.multiselect("Filtrar por Líder Directo", options=sorted(df[COL_JEFE].unique()) if COL_JEFE in df.columns else ["N/A"])
-    
-    df_plot = df.copy()
-    if filter_jefe:
-        df_plot = df_plot[df_plot[COL_JEFE].isin(filter_jefe)]
+# --- INTERFAZ PRINCIPAL ---
+st.title("📊 Business Intelligence: Performance Comercial")
+st.info("Visualización analítica para la gestión de equipos y resultados.")
 
-    # --- INDICADORES CLAVE (KPIs) ---
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+if not df.empty:
+    # --- BARRA LATERAL (FILTROS) ---
+    st.sidebar.header("Filtros de Análisis")
     
-    with kpi1:
-        st.metric("Dotación Evaluada", len(df_plot))
-    with kpi2:
-        avg_obj = df_plot[COL_OBJETIVOS].mean()
-        st.metric("Promedio Objetivos", f"{avg_obj:.2f}")
-    with kpi3:
-        avg_comp = df_plot[COL_COMPETENCIAS].mean()
-        st.metric("Promedio Competencias", f"{avg_comp:.2f}")
-    with kpi4:
-        top_perf = len(df_plot[df_plot[COL_PUNTAJE_FINAL] >= 4])
-        st.metric("High Performers (>4)", top_perf)
+    # Filtros dinámicos basados en tus datos
+    brand_col = next((c for c in df.columns if 'marca' in c or 'empresa' in c), None)
+    vendedor_col = next((c for c in df.columns if 'nombre' in c or 'vendedor' in c), 'vendedor')
+    
+    selected_brands = []
+    if brand_col:
+        selected_brands = st.sidebar.multiselect("Marca/Empresa", options=df[brand_col].unique(), default=df[brand_col].unique())
+    
+    # Filtrado de datos
+    df_filtered = df.copy()
+    if selected_brands:
+        df_filtered = df_filtered[df_filtered[brand_col].isin(selected_brands)]
+
+    # --- KPIs SUPERIORES ---
+    m1, m2, m3, m4 = st.columns(4)
+    
+    # Cálculo de cumplimiento
+    if 'ventas' in df_filtered.columns and 'objetivo' in df_filtered.columns:
+        total_ventas = df_filtered['ventas'].sum()
+        total_obj = df_filtered['objetivo'].sum()
+        cumplimiento_gen = (total_ventas / total_obj * 100) if total_obj > 0 else 0
+        
+        m1.metric("Ventas Totales", f"{total_ventas:,.0f}")
+        m2.metric("Objetivo Global", f"{total_obj:,.0f}")
+        m3.metric("% Cumplimiento", f"{cumplimiento_gen:.1f}%")
+        m4.metric("Dotación Activa", len(df_filtered))
 
     st.divider()
 
-    # --- ANÁLISIS ANALÍTICO ---
-    col_left, col_right = st.columns([1, 1])
+    # --- BLOQUE ANALÍTICO 1: PERFORMANCE ---
+    col_a, col_b = st.columns(2)
 
-    with col_left:
-        st.markdown("### 🎯 Matriz de Talento (Competencias vs Objetivos)")
-        # Este gráfico es clave en People Analytics para ver quién "sabe hacer" vs "quién llega a la meta"
-        fig_matrix = px.scatter(
-            df_plot, 
-            x=COL_COMPETENCIAS, 
-            y=COL_OBJETIVOS,
-            size=COL_PUNTAJE_FINAL,
-            color=COL_JEFE if COL_JEFE in df.columns else None,
-            hover_name=COL_NOMBRE,
-            text=COL_NOMBRE if len(df_plot) < 15 else None,
-            labels={COL_COMPETENCIAS: "Nivel de Competencias", COL_OBJETIVOS: "Cumplimiento Objetivos"},
-            template="plotly_white"
-        )
-        fig_matrix.add_hline(y=df_plot[COL_OBJETIVOS].mean(), line_dash="dot", line_color="gray")
-        fig_matrix.add_vline(x=df_plot[COL_COMPETENCIAS].mean(), line_dash="dot", line_color="gray")
-        st.plotly_chart(fig_matrix, use_container_width=True)
-
-    with col_right:
-        st.markdown("### 🏆 Top 10 Desempeño Consolidado")
-        top_10 = df_plot.nlargest(10, COL_PUNTAJE_FINAL)
+    with col_a:
+        st.subheader("🏆 Ranking de Cumplimiento por Asesor")
+        df_filtered['% cumpl.'] = (df_filtered['ventas'] / df_filtered['objetivo'] * 100).round(1)
         fig_rank = px.bar(
-            top_10, 
-            x=COL_PUNTAJE_FINAL, 
-            y=COL_NOMBRE, 
-            orientation='h',
-            color=COL_PUNTAJE_FINAL,
-            color_continuous_scale='Blues',
-            text_auto=True
+            df_filtered.sort_values('% cumpl.', ascending=True).tail(10),
+            x='% cumpl.', y=vendedor_col, orientation='h',
+            text='% cumpl.', color='% cumpl.',
+            color_continuous_scale='RdYlGn'
         )
-        fig_rank.update_layout(yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_rank, use_container_width=True)
 
-    # --- DETALLE POR LÍDER ---
-    st.markdown("### 📊 Desempeño Promedio por Equipo (Jefe Directo)")
-    if COL_JEFE in df_plot.columns:
-        df_jefe = df_plot.groupby(COL_JEFE)[[COL_COMPETENCIAS, COL_OBJETIVOS]].mean().reset_index()
-        fig_jefe = go.Figure()
-        fig_jefe.add_trace(go.Bar(name='Competencias', x=df_jefe[COL_JEFE], y=df_jefe[COL_COMPETENCIAS], marker_color='#1f77b4'))
-        fig_jefe.add_trace(go.Bar(name='Objetivos', x=df_jefe[COL_JEFE], y=df_jefe[COL_OBJETIVOS], marker_color='#ff7f0e'))
-        fig_jefe.update_layout(barmode='group', template="plotly_white")
-        st.plotly_chart(fig_jefe, use_container_width=True)
+    with col_b:
+        st.subheader("📈 Relación Ventas vs Objetivos")
+        fig_scatter = px.scatter(
+            df_filtered, x='objetivo', y='ventas', 
+            size='ventas', color='% cumpl.',
+            hover_name=vendedor_col, trendline="ols",
+            color_continuous_scale='Viridis'
+        )
+        st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # --- TABLA DE DATOS ---
-    with st.expander("🔍 Explorar Base de Datos Completa"):
-        st.dataframe(df_plot.style.highlight_max(axis=0, subset=[COL_PUNTAJE_FINAL]))
+    # --- BLOQUE ANALÍTICO 2: MATRIZ 9-BOX (People Analytics) ---
+    st.divider()
+    st.subheader("🎯 Matriz de Talento: Desempeño vs Competencias")
+    
+    if 'competencias' in df_filtered.columns:
+        # Definimos cuadrantes
+        fig_9box = px.scatter(
+            df_filtered, 
+            x='competencias', 
+            y='ventas' if 'ventas' not in df_filtered.columns else '% cumpl.',
+            text=vendedor_col,
+            size_max=20,
+            labels={'x': 'Nivel de Competencias', 'y': '% Desempeño'},
+            template="plotly_white",
+            height=600
+        )
+        # Líneas de cuadrantes (promedios)
+        fig_9box.add_hline(y=df_filtered['% cumpl.'].mean(), line_dash="dot", line_color="red")
+        fig_9box.add_vline(x=df_filtered['competencias'].mean(), line_dash="dot", line_color="red")
+        
+        st.plotly_chart(fig_9box, use_container_width=True)
+        st.caption("Los cuadrantes ayudan a identificar: Estrellas (Sup-Der), Potenciales (Inf-Der) y Áreas de Mejora (Inf-Izq).")
 
-except Exception as e:
-    st.error(f"Error al procesar la nueva base de datos: {e}")
-    st.info("Asegúrate de que el link de Google Sheets sea público ('Cualquier persona con el enlace').")
+    # --- TABLA MAESTRA ---
+    with st.expander("🔍 Ver Detalle de Datos"):
+        st.dataframe(df_filtered.style.background_gradient(cmap='Blues', subset=['ventas']))
+
+else:
+    st.warning("No se pudo leer la información. Verifica que el enlace de publicación sea el correcto.")
